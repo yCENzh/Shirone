@@ -259,10 +259,28 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 							);
 
 				// ── 6. Push everything into the Astro config ────────────────────
+				// `image.endpoint.route` needs the trailing slash that pairs with
+				// `trailingSlash: "always"` below. Astro's relative transform would
+				// normally append it, but that transform runs once during
+				// resolveConfig, when trailingSlash is still the default "ignore".
+				// Changing trailingSlash here in updateConfig does not re-run it —
+				// hooks.js only calls validateConfigRefined afterwards, which does
+				// not include the relative transform — so the route is never
+				// normalised. Without the slash the URL builder emits /_image?…
+				// while the route pattern expects /_image/, and every image request
+				// 404s in dev (build and preview are unaffected).
+				//
+				// ⚠️ If trailingSlash ever changes, change this to match:
+				//    "always" → "/_image/"  |  "never" / "ignore" → "/_image"
+				// If Astro fixes the ordering (re-running the relative transform
+				// after config:setup) this line becomes redundant but harmless, and
+				// can be deleted.
+				// Tracking: withastro/astro#11568, #10149.
 				updateConfig({
 					...(siteConfig?.site ? { site: siteConfig.site } : {}),
 					base: siteConfig?.base ?? "/",
 					trailingSlash: "always",
+					image: { endpoint: { route: "/_image/" } },
 					fonts: fonts as never,
 					integrations,
 					markdown: { processor: processor as never },
