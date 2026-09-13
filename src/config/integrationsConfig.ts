@@ -79,7 +79,7 @@ export const IMAGE_ENDPOINT_ROUTE = "/_image/";
  * 页面，所以两侧行为必须一致。
  */
 export const swupOptions = {
-	theme: false,
+	theme: false as const,
 	ignore: ['a[href="#"]'],
 	animationClass: "transition-swup-",
 	containers: ["main", "#toc"],
@@ -197,7 +197,7 @@ export function svelteCompilerOptions(isDev: boolean) {
 
 /** `@astrojs/mdx` 的选项。 */
 export const mdxOptions = {
-	syntaxHighlight: false,
+	syntaxHighlight: false as const,
 	optimize: true,
 };
 
@@ -209,9 +209,9 @@ export const mdxOptions = {
  * `shirones` 仓的 `docs/plans/single-source-config.md`。
  */
 export const viteBuildShared = {
-	minify: "esbuild",
+	minify: "esbuild" as const,
 	cssCodeSplit: true,
-	cssMinify: "esbuild",
+	cssMinify: "esbuild" as const,
 	chunkSizeWarningLimit: 1000,
 	rollupOptions: {
 		onwarn(
