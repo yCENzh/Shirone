@@ -188,6 +188,7 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 				const siteConfig = siteModule.siteConfig as {
 					site?: string;
 					base?: string;
+					trailingSlash?: "always" | "never" | "ignore";
 				};
 
 				const sidebarModule = await loadConfigModule(paths, "sidebarConfig", registryRef);
@@ -261,8 +262,8 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 				// ── 6. Push everything into the Astro config ────────────────────
 				updateConfig({
 					...(siteConfig?.site ? { site: siteConfig.site } : {}),
-					base: siteConfig?.base ?? "/",
-					trailingSlash: "always",
+				base: siteConfig?.base ?? "/",
+				trailingSlash: siteConfig?.trailingSlash ?? "always",
 					fonts: fonts as never,
 					integrations,
 					markdown: { processor: processor as never },

@@ -78,6 +78,14 @@ export type BannerConfig = {
 export type SiteConfig = {
 	site: string;
 	base?: string;
+	/**
+	 * URL 尾斜杠策略，透传给 Astro 的同名配置。
+	 *
+	 * 默认 `"always"`（主题原有行为）。注意：Astro 在 `"always"` 下会重写内置
+	 * 图片服务的路由，dev 模式下 `/_image` 请求可能 404；遇到该问题可改为
+	 * `"ignore"` 或 `"never"`。build / preview 不受影响。
+	 */
+	trailingSlash?: "always" | "never" | "ignore";
 	title: string;
 	subtitle: string;
 	/** 默认社交媒体分享预览图（og:image / twitter:image），支持本地相对路径或远程绝对链接。未配置时自动回退为第一张桌面版横幅壁纸。 */
