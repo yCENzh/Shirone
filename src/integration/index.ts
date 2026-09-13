@@ -259,19 +259,23 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 							);
 
 				// ── 6. Push everything into the Astro config ────────────────────
-				// `image.endpoint.route` 必须带尾斜杠,与下面的 `trailingSlash: "always"`
-				// 配套。Astro 的 relative transform 本会自动补这个斜杠,但它只在
-				// resolveConfig 阶段跑一次,那时 trailingSlash 还是默认 "ignore";这里
-				// 的 updateConfig 改 trailingSlash 之后,hooks.js 只跑
-				// validateConfigRefined(不含 relative transform),route 不会再被规范化。
-				// 少了这个斜杠,URL 生成端吐 /_image?… 而路由 pattern 要求 /_image/,
-				// dev 下图片请求全部 404(build / preview 不受影响)。
+				// `image.endpoint.route` needs the trailing slash that pairs with
+				// `trailingSlash: "always"` below. Astro's relative transform would
+				// normally append it, but that transform runs once during
+				// resolveConfig, when trailingSlash is still the default "ignore".
+				// Changing trailingSlash here in updateConfig does not re-run it —
+				// hooks.js only calls validateConfigRefined afterwards, which does
+				// not include the relative transform — so the route is never
+				// normalised. Without the slash the URL builder emits /_image?…
+				// while the route pattern expects /_image/, and every image request
+				// 404s in dev (build and preview are unaffected).
 				//
-				// ⚠️ 若日后改动 trailingSlash,必须同步改这里:
+				// ⚠️ If trailingSlash ever changes, change this to match:
 				//    "always" → "/_image/"  |  "never" / "ignore" → "/_image"
-				// 若 Astro 修复了该时序问题(让 relative transform 在 config:setup 后
-				// 重跑),这一行会变成冗余但无害,可删除。
-				// 跟踪:withastro/astro#11568、#10149。
+				// If Astro fixes the ordering (re-running the relative transform
+				// after config:setup) this line becomes redundant but harmless, and
+				// can be deleted.
+				// Tracking: withastro/astro#11568, #10149.
 				updateConfig({
 					...(siteConfig?.site ? { site: siteConfig.site } : {}),
 					base: siteConfig?.base ?? "/",
