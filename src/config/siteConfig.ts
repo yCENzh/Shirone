@@ -12,10 +12,6 @@ import { withUserConfig } from "../utils/config-overlay.ts";
 export const siteConfig: SiteConfig = withUserConfig("site", {
 	site: "https://shirone.mysqil.com/",
 	base: "/",
-	// URL 尾斜杠策略："always"（默认）/ "never" / "ignore"。
-	// 注意：Astro 在 "always" 下会重写内置图片服务路由，dev 模式下 /_image
-	// 请求可能 404（build / preview 不受影响）。遇到该问题可改为 "ignore"。
-	trailingSlash: "always",
 	title: "Shirone",
 	subtitle: "A Material 3 anime blog",
 	// 电脑端顶栏标题与导航内容区域："left" 左对齐，"center" 居中。
