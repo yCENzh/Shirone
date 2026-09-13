@@ -1,4 +1,16 @@
 /**
+ * 下列 import 全部是 `import type`,在编译期被完全擦除,不产生任何运行时依赖。
+ * 用 `Parameters<typeof fn>[0]` 而不是写死类型名,是为了让这里的标注跟着各集成
+ * 自己的声明走——它们升级改了选项形状时,这里会跟着报错,而不是悄悄失配。
+ */
+
+import type mdx from "@astrojs/mdx";
+import type swup from "@swup/astro";
+import type expressiveCode from "astro-expressive-code";
+import type icon from "astro-icon";
+import type { BuildOptions } from "vite";
+
+/**
  * 两个 Astro 配置入口共享的集成选项。
  *
  * 主题有两份 Astro 配置，且互不引用：
@@ -78,7 +90,7 @@ export const IMAGE_ENDPOINT_ROUTE = "/_image/";
  * 选择器，语法高亮等按页注入的样式会在 Swup 切换后残留。包模式同样注入这些
  * 页面，所以两侧行为必须一致。
  */
-export const swupOptions = {
+export const swupOptions: NonNullable<Parameters<typeof swup>[0]> = {
 	theme: false as const,
 	ignore: ['a[href="#"]'],
 	animationClass: "transition-swup-",
@@ -102,11 +114,11 @@ export const swupOptions = {
  * `@swup/astro` 1.8.0 的 `Options` 类型不认识、但主题确实要传的选项。该版本在
  * 运行时会静默丢弃它们。
  *
- * 单独拆开是因为包模式把 `swupOptions` 展开进对象字面量时，TS 的多余属性检查
- * 会拦住未知的键；拆成第二个对象再展开就能绕过，同时不改变运行时行为。源码
- * 模式是 JS，不受这个检查约束，但两侧传同一份内容才能保持行为一致。
+ * 必须和 `swupOptions` 分开：`swupOptions` 标注为 `Partial<Options>`，把这两个
+ * 键写进去会直接报 ts(2353)。这个标注本身是有意义的——它是本文件里唯一能让
+ * swup 选项拼写错误在编译期暴露出来的东西，不要为了让这里能合并而把它去掉。
  *
- * 等 `@swup/astro` 的类型补上这两个键之后，可以把它们并回 `swupOptions`。
+ * 等 `@swup/astro` 的类型补上这两个键之后，才可以把它们并回 `swupOptions`。
  */
 export const swupForwardOptions = {
 	animateHistoryBrowsing: false,
@@ -122,7 +134,9 @@ export const swupForwardOptions = {
  * 在扁平 `node_modules` 下的自动发现兜住；包模式在 pnpm 严格布局下没有这个
  * 退路，必须显式声明。
  */
-export const iconInclude = {
+export const iconInclude: NonNullable<
+	NonNullable<Parameters<typeof icon>[0]>["include"]
+> = {
 	"material-symbols": ["*"],
 	"simple-icons": ["*"],
 	"fa6-brands": ["*"],
@@ -137,7 +151,10 @@ export const iconInclude = {
  * import，包模式走 `loadConfigModule()` 让用户的覆盖生效）。`plugins` 也不在：
  * 包模式必须走 `loadPackageModule()`。
  */
-export const expressiveCodeShared = {
+export const expressiveCodeShared: Omit<
+	NonNullable<Parameters<typeof expressiveCode>[0]>,
+	"themes" | "plugins"
+> = {
 	defaultProps: {
 		wrap: true,
 		overridesByLang: {
@@ -164,11 +181,11 @@ export const expressiveCodeShared = {
 			editorTabBarBorderBottomColor: "var(--codeblock-topbar-bg)",
 			terminalTitlebarBorderBottomColor: "none",
 		},
-		textMarkers: {
-			delHue: 0,
-			insHue: 180,
-			markHue: 250,
-		},
+		// Hue values are numbers at runtime — the source config has always
+		// passed numbers — but the published types only accept unresolved CSS
+		// strings. Cast here rather than at the use sites so both modes stay
+		// type-checked everywhere else.
+		textMarkers: { delHue: 0, insHue: 180, markHue: 250 } as never,
 	},
 	frames: {
 		showCopyToClipboardButton: false,
@@ -196,7 +213,7 @@ export function svelteCompilerOptions(isDev: boolean) {
 }
 
 /** `@astrojs/mdx` 的选项。 */
-export const mdxOptions = {
+export const mdxOptions: NonNullable<Parameters<typeof mdx>[0]> = {
 	syntaxHighlight: false as const,
 	optimize: true,
 };
@@ -208,16 +225,16 @@ export const mdxOptions = {
  * 用户自己代码里的 `console.log`，属于需要单独决策的行为差异，见
  * `shirones` 仓的 `docs/plans/single-source-config.md`。
  */
-export const viteBuildShared = {
+export const viteBuildShared: BuildOptions = {
 	minify: "esbuild" as const,
 	cssCodeSplit: true,
 	cssMinify: "esbuild" as const,
 	chunkSizeWarningLimit: 1000,
 	rollupOptions: {
-		onwarn(
-			warning: { message: string },
-			warn: (warning: unknown) => void,
-		) {
+		// Parameter types are inferred from `BuildOptions`. Hand-writing them
+		// narrower than rolldown's OnwarnFunction made the whole object fail to
+		// type-check.
+		onwarn(warning, defaultHandler) {
 			// Astro legitimately mixes static and dynamic imports for islands;
 			// silence that specific advisory.
 			if (
@@ -226,7 +243,7 @@ export const viteBuildShared = {
 			) {
 				return;
 			}
-			warn(warning);
+			defaultHandler(warning);
 		},
 	},
 };

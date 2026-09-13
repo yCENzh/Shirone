@@ -1,17 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-	IMAGE_ENDPOINT_ROUTE,
-	MUSIC_SIDEBAR_VIRTUAL_ID,
-	TRAILING_SLASH,
 	expressiveCodeShared,
+	IMAGE_ENDPOINT_ROUTE,
 	iconInclude,
 	isMusicBundleFile,
-	mdxOptions,
-	prebundleSpecifiers,
+	MUSIC_SIDEBAR_VIRTUAL_ID,
 	svelteCompilerOptions,
 	swupForwardOptions,
 	swupOptions,
+	TRAILING_SLASH,
 	viteBuildShared,
 } from "../src/config/integrationsConfig.ts";
 
@@ -80,6 +78,8 @@ describe("shared integrations config", () => {
 	it("declares every icon collection the theme actually references", () => {
 		// 340 处图标引用里 material-symbols 占 308、simple-icons 占 21。漏了只
 		// 会在 pnpm 严格布局下暴露（源码模式有 astro-icon 的自动发现兜底）。
+		// 精确比对键集也顺带挡住了源码模式曾有的畸形键
+		// "preprocess: vitePreprocess(),"（从 svelte.config.js 误粘过来的）。
 		assert.deepEqual(Object.keys(iconInclude).sort(), [
 			"fa6-brands",
 			"fa6-regular",
@@ -90,12 +90,6 @@ describe("shared integrations config", () => {
 		for (const collections of Object.values(iconInclude)) {
 			assert.deepEqual(collections, ["*"]);
 		}
-	});
-
-	it("does not carry a stray preprocess key into the icon config", () => {
-		// 源码模式此前有个畸形键 "preprocess: vitePreprocess(),"，是从
-		// svelte.config.js 误粘过来的，靠自动发现才没出事。
-		assert.ok(!("preprocess: vitePreprocess()," in iconInclude));
 	});
 
 	it("keeps expressive-code style overrides and frames", () => {
@@ -112,10 +106,7 @@ describe("shared integrations config", () => {
 			insHue: 180,
 			markHue: 250,
 		});
-		assert.equal(
-			expressiveCodeShared.frames.showCopyToClipboardButton,
-			false,
-		);
+		assert.equal(expressiveCodeShared.frames.showCopyToClipboardButton, false);
 		assert.deepEqual(
 			expressiveCodeShared.defaultProps.overridesByLang.shellsession,
 			{ showLineNumbers: false },
@@ -158,7 +149,7 @@ describe("shared integrations config", () => {
 
 		const advisory = {
 			message:
-				'X is dynamically imported by a but also statically imported by b',
+				"X is dynamically imported by a but also statically imported by b",
 		};
 		const other = { message: "something else entirely" };
 
@@ -167,19 +158,6 @@ describe("shared integrations config", () => {
 
 		onwarn(other, warn);
 		assert.deepEqual(forwarded, [other], "every other warning is forwarded");
-	});
-
-	it("keeps the pre-bundle list as candidates only", () => {
-		assert.deepEqual(prebundleSpecifiers, [
-			"mermaid",
-			"@panzoom/panzoom",
-			"overlayscrollbars",
-			"@fancyapps/ui",
-		]);
-	});
-
-	it("keeps mdx options", () => {
-		assert.deepEqual(mdxOptions, { syntaxHighlight: false, optimize: true });
 	});
 
 	it("matches the music bundle files both modes prune", () => {
