@@ -259,11 +259,26 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 								registryRef,
 							);
 
-				// ── 6. Push everything into the Astro config ────────────────────
-				updateConfig({
-					...(siteConfig?.site ? { site: siteConfig.site } : {}),
+			// ── 6. Push everything into the Astro config ────────────────────
+			// Astro 7.x 的 relative transform(给 image.endpoint.route 补/去尾斜杠)
+			// 只在 resolveConfig 阶段跑一次,那时 trailingSlash 还是默认 "ignore"。
+			// 之后这里 updateConfig 改 trailingSlash,hooks.js 只跑
+			// validateConfigRefined(不含 relative transform),endpoint.route 不再被
+			// 规范化。结果:URL 生成端(虚拟模块内联 route)和路由端(pattern 按最终
+			// trailingSlash)不一致 → dev 下 /_image 请求 404。
+			//
+			// 手动补上 transform 漏掉的规范化,让 route 跟随最终 trailingSlash。
+			// ⚠️ 若 Astro 未来修复此 bug(让 relative transform 在 config:setup 后
+			//    重跑),这段代码变成幂等(已规范化的 route 再规范化结果不变),可安全
+			//    保留或删除。跟踪:withastro/astro#11568、#10149。
+			const trailingSlash = siteConfig?.trailingSlash ?? "always";
+			const imageEndpointRoute =
+				trailingSlash === "always" ? "/_image/" : "/_image";
+			updateConfig({
+				...(siteConfig?.site ? { site: siteConfig.site } : {}),
 				base: siteConfig?.base ?? "/",
-				trailingSlash: siteConfig?.trailingSlash ?? "always",
+				trailingSlash,
+				image: { endpoint: { route: imageEndpointRoute } },
 					fonts: fonts as never,
 					integrations,
 					markdown: { processor: processor as never },
