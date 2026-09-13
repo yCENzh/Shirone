@@ -8,7 +8,7 @@ import type mdx from "@astrojs/mdx";
 import type swup from "@swup/astro";
 import type expressiveCode from "astro-expressive-code";
 import type icon from "astro-icon";
-import type { BuildOptions } from "vite";
+import type { AstroUserConfig } from "astro";
 
 /**
  * 两个 Astro 配置入口共享的集成选项。
@@ -225,13 +225,15 @@ export const mdxOptions: NonNullable<Parameters<typeof mdx>[0]> = {
  * 用户自己代码里的 `console.log`，属于需要单独决策的行为差异，见
  * `shirones` 仓的 `docs/plans/single-source-config.md`。
  */
-export const viteBuildShared: BuildOptions = {
+export const viteBuildShared: NonNullable<
+	NonNullable<AstroUserConfig["vite"]>["build"]
+> = {
 	minify: "esbuild" as const,
 	cssCodeSplit: true,
 	cssMinify: "esbuild" as const,
 	chunkSizeWarningLimit: 1000,
 	rollupOptions: {
-		// Parameter types are inferred from `BuildOptions`. Hand-writing them
+		// Parameter types are inferred from the build-options type. Hand-writing them
 		// narrower than rolldown's OnwarnFunction made the whole object fail to
 		// type-check.
 		onwarn(warning, defaultHandler) {
