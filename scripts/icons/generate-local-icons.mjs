@@ -6,11 +6,66 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, extname, join, relative } from "node:path";
+
+const PACKAGE_NAME = "shirones";
 
 const projectRoot = process.cwd();
 const sourceRoot = join(projectRoot, "src");
 const outputPath = join(sourceRoot, "generated", "local-icon-collections.ts");
+
+/**
+ * Extra roots to scan beyond `src/`.
+ *
+ * Two gaps make `src/` alone insufficient once the theme runs as a package:
+ *
+ * - The user's own content lives at `<contentRoot>/content`, outside `src/`. An
+ *   icon referenced only from a post would otherwise be missing, so
+ *   `Icon.svelte` could not render it.
+ * - The theme's own components are not in the user's `src/` either — they live
+ *   in the installed package. Without them the collection would contain the
+ *   user's icons and none of the theme's, and every icon the theme itself uses
+ *   would disappear.
+ *
+ * Roots that do not exist are skipped, so source mode — where the theme *is* the
+ * project — resolves to exactly the pre-existing behaviour.
+ */
+function resolvePackageSrc() {
+	try {
+		const manifest = createRequire(join(projectRoot, "index.js")).resolve(
+			`${PACKAGE_NAME}/package.json`,
+		);
+		const dir = dirname(manifest);
+		// The published layout keeps sources under `src/`; a plain checkout has
+		// them at the root next to package.json.
+		for (const candidate of [join(dir, "src"), dir]) {
+			if (existsSync(join(candidate, "components"))) return candidate;
+		}
+	} catch {
+		// Not installed as a dependency: source mode, or a project that vendors
+		// the theme another way. Nothing extra to scan.
+	}
+	return null;
+}
+
+const extraRoots = [];
+{
+	const configured = process.env.SHIRONES_CONTENT_ROOT?.trim() || PACKAGE_NAME;
+	for (const root of configured
+		.split(",")
+		.map((r) => r.trim())
+		.filter(Boolean)) {
+		const absolute = join(projectRoot, root);
+		// Skip a root that sits inside `src/`; the sweep below already covers it.
+		if (!absolute.startsWith(`${sourceRoot}/`) && existsSync(absolute)) {
+			extraRoots.push(absolute);
+		}
+	}
+	const packageSrc = resolvePackageSrc();
+	if (packageSrc) extraRoots.push(packageSrc);
+}
+
 const sourceExtensions = new Set([
 	".astro",
 	".md",
@@ -42,8 +97,15 @@ function collectSourceFiles(directory) {
 	return files;
 }
 
+const scannedFiles = [
+	...collectSourceFiles(sourceRoot),
+	// User content first: a post is the likeliest place for a new icon reference,
+	// and ordering keeps the reported counts stable when both mention the same one.
+	...extraRoots.flatMap(collectSourceFiles),
+];
+
 const requested = new Map();
-for (const file of collectSourceFiles(sourceRoot)) {
+for (const file of scannedFiles) {
 	const source = readFileSync(file, "utf8");
 	for (const match of source.matchAll(iconPattern)) {
 		const { prefix, name } = match.groups;
