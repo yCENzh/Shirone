@@ -21,9 +21,8 @@ const sourceExtensions = new Set([
 ]);
 const iconPattern = /\b(?<prefix>[a-z][a-z0-9-]*):(?<name>[a-z0-9-]+)\b/g;
 const iconPrefixes = new Set([
-	"fa6-brands",
-	"fa6-regular",
-	"fa6-solid",
+	"fa7-brands",
+	"fa7-solid",
 	"material-symbols",
 	"simple-icons",
 ]);

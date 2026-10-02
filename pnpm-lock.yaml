@@ -50,15 +50,6 @@ importers:
       '@fontsource/roboto':
         specifier: ^5.3.0
         version: 5.3.0
-      '@iconify-json/fa6-brands':
-        specifier: ^1.2.6
-        version: 1.2.6
-      '@iconify-json/fa6-regular':
-        specifier: ^1.2.4
-        version: 1.2.4
-      '@iconify-json/fa6-solid':
-        specifier: ^1.2.4
-        version: 1.2.4
       '@iconify-json/material-symbols':
         specifier: ^1.2.93
         version: 1.2.93
@@ -195,6 +186,12 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.14
         version: 2.5.14
+      '@iconify-json/fa7-brands':
+        specifier: ^1.2.4
+        version: 1.2.4
+      '@iconify-json/fa7-solid':
+        specifier: ^1.2.5
+        version: 1.2.5
       '@iconify-json/simple-icons':
         specifier: ^1.2.98
         version: 1.2.98
@@ -1316,14 +1313,11 @@ packages:
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
 
-  '@iconify-json/fa6-brands@1.2.6':
-    resolution: {integrity: sha512-twL3X4KWcxAhbc1vz/mIDsVr+CAItk1/EIfxKUVQtpv6O4eydk5KNYqTZWdvJNHGInUgd6vKg21aWfVgb5DXEg==}
+  '@iconify-json/fa7-brands@1.2.4':
+    resolution: {integrity: sha512-60acXyxhQl1lddBH5YGzfQLkzlP9jqNcblFmgel7lJpgsVx/4QmrXAL90ARb8XhHX7dFMGRDmlqER9mq8aaz2g==}
 
-  '@iconify-json/fa6-regular@1.2.4':
-    resolution: {integrity: sha512-fnUS/MLj3ZAp29oRsC8/aY8Wau7NIg7VesTz3jCcE6VJBzcz95Yxp/Dl5yHvkP+aQxrNw5Lj3nrOXB4nQh+oNA==}
-
-  '@iconify-json/fa6-solid@1.2.4':
-    resolution: {integrity: sha512-LmDNNdJVyvF5mPm1yxWvL8KjCc/E8LzoqnF1LNTVpyY2ZJRUlGOWuPIThdbuFBF2IovgttkIyumhyqfmlHdwKg==}
+  '@iconify-json/fa7-solid@1.2.5':
+    resolution: {integrity: sha512-e9EOtXuvDhiv6gBjbuW1q4bSR2tU5HmsDxqbLElQt2w2dR1Byh2mXfPLdRgEVwEr50uQV5tKxE3YAL6LTa+1fA==}
 
   '@iconify-json/material-symbols@1.2.93':
     resolution: {integrity: sha512-IfbpRixmEdeBrl2Bc+RtNZGb3NcTnMiPP4WausCParQYpIdezEYYbgMggJC1cYzm1q0f77p53t5tppy9PWsrvQ==}
@@ -7940,15 +7934,11 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@iconify-json/fa6-brands@1.2.6':
+  '@iconify-json/fa7-brands@1.2.4':
     dependencies:
       '@iconify/types': 2.0.0
 
-  '@iconify-json/fa6-regular@1.2.4':
-    dependencies:
-      '@iconify/types': 2.0.0
-
-  '@iconify-json/fa6-solid@1.2.4':
+  '@iconify-json/fa7-solid@1.2.5':
     dependencies:
       '@iconify/types': 2.0.0
 

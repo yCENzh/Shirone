@@ -132,9 +132,8 @@ export const iconInclude: NonNullable<
 > = {
 	"material-symbols": ["*"],
 	"simple-icons": ["*"],
-	"fa6-brands": ["*"],
-	"fa6-regular": ["*"],
-	"fa6-solid": ["*"],
+	"fa7-brands": ["*"],
+	"fa7-solid": ["*"],
 };
 
 /**
