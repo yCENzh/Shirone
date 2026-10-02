@@ -18,7 +18,8 @@
  * Run: `node scripts/check-package-manifest.mjs`
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { extname, join, relative, resolve } from "node:path";
 
 const ROOT = resolve(".");
@@ -54,22 +55,20 @@ const tsconfigText = readFileSync(join(ROOT, "tsconfig.json"), "utf8")
 	.replace(/^\s*\/\/.*$/gm, "")
 	.replace(/,(\s*[}\]])/g, "$1");
 const tsconfigPaths = JSON.parse(tsconfigText).compilerOptions?.paths ?? {};
-const aliasPrefixes = Object.keys(tsconfigPaths).map((p) => p.replace(/\*$/, ""));
+const aliasPrefixes = Object.keys(tsconfigPaths).map((p) =>
+	p.replace(/\*$/, ""),
+);
 
-/** Vite aliases the integration installs; they point at real files, not packages. */
-const integrationViteAliases = aliasPrefixes.filter((p) => p.startsWith("@shirone/"));
-
-/** Node builtins and `node:`-prefixed specifiers. */
+/**
+ * Node builtins and `node:`-prefixed specifiers.
+ *
+ * `builtinModules` is the authoritative list; a hand-written one drifts (it was
+ * missing `node:test` and `node:sqlite`, among others) and every omission is a
+ * false positive someone then has to silence.
+ */
+const BUILTIN_MODULES = new Set(builtinModules);
 const isBuiltin = (spec) =>
-	spec.startsWith("node:") || BUILTINS.has(spec.split("/")[0]);
-
-const BUILTINS = new Set([
-	"assert", "buffer", "child_process", "cluster", "console", "constants", "crypto",
-	"dgram", "dns", "domain", "events", "fs", "http", "http2", "https", "inspector",
-	"module", "net", "os", "path", "perf_hooks", "process", "punycode", "querystring",
-	"readline", "repl", "stream", "string_decoder", "sys", "timers", "tls", "trace_events",
-	"tty", "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib",
-]);
+	spec.startsWith("node:") || BUILTIN_MODULES.has(spec.split("/")[0]);
 
 // Virtual specifiers. These are never files on disk, so they cannot be npm
 // packages and must not be reported:
@@ -88,12 +87,23 @@ const isVirtual = (spec) =>
 	spec.startsWith("#") ||
 	spec === "shirones";
 
-const SCANNED = new Set([".ts", ".mts", ".js", ".mjs", ".cjs", ".astro", ".svelte", ".tsx", ".jsx"]);
+const SCANNED = new Set([
+	".ts",
+	".mts",
+	".js",
+	".mjs",
+	".cjs",
+	".astro",
+	".svelte",
+	".tsx",
+	".jsx",
+]);
 
 /** Collect every file under `src/`, skipping generated and binary trees. */
 function walk(dir, acc = []) {
 	for (const entry of readdirSync(dir)) {
-		if (entry === "node_modules" || entry === "dist" || entry.startsWith(".")) continue;
+		if (entry === "node_modules" || entry === "dist" || entry.startsWith("."))
+			continue;
 		const full = join(dir, entry);
 		if (statSync(full).isDirectory()) walk(full, acc);
 		else if (SCANNED.has(extname(entry))) acc.push(full);
@@ -102,19 +112,36 @@ function walk(dir, acc = []) {
 }
 
 /**
- * Extract bare specifiers from import/export/dynamic-import forms.
- * Deliberately regex-based: the alternative is evaluating theme source, and this
- * runs on every commit. It over-collects slightly, which only makes the check
- * stricter, never looser.
+ * Extract specifiers that are imported at **runtime**, keyed by name.
  *
- * Comment lines are stripped first. Prose routinely mentions specifiers in
- * backticks — `import shirones from 'shirones'` in a usage example, a bare
- * module name in a sentence — and a checker that reads documentation as code
- * would bury real findings under noise.
+ * Deliberately regex-based: the alternative is evaluating theme source, and this
+ * runs on every commit. Two consequences shape the implementation.
+ *
+ * Comments are stripped first. Prose routinely mentions specifiers in backticks
+ * — `import shirones from 'shirones'` in a usage example — and a checker that
+ * reads documentation as code buries real findings under noise.
+ *
+ * Type-only imports are excluded, and the decision is made **per specifier, not
+ * per file**. `import type Swup from "swup"` needs the types at compile time but
+ * emits no runtime import, so it cannot break a user's build. A file that mixes
+ * a type import with a genuinely undeclared runtime import must still report the
+ * latter — testing `import type` against the whole source would waive it.
  */
-function bareSpecifiers(source) {
+function runtimeSpecifiers(source) {
 	const code = stripComments(source);
 	const out = new Set();
+
+	// `import type … from "x"`, and the `{ … } from "x"` block form. Matched first
+	// and collected separately so the runtime pass can subtract them.
+	const typeOnly = new Set();
+	const typePatterns = [
+		/\bimport\s+type\s+[^;'"]*?\bfrom\s*["']([^"']+)["']/g,
+		/\bexport\s+type\s+[^;'"]*?\bfrom\s*["']([^"']+)["']/g,
+	];
+	for (const re of typePatterns) {
+		for (const m of code.matchAll(re)) typeOnly.add(m[1]);
+	}
+
 	const patterns = [
 		/\bfrom\s*["']([^"']+)["']/g,
 		/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
@@ -125,6 +152,7 @@ function bareSpecifiers(source) {
 		for (const m of code.matchAll(re)) {
 			const spec = m[1];
 			if (spec.startsWith(".") || spec.startsWith("/")) continue;
+			if (typeOnly.has(spec)) continue;
 			out.add(spec);
 		}
 	}
@@ -138,30 +166,21 @@ function stripComments(source) {
 		.replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
-/**
- * Reduce a specifier to its package name for the dependency lookup. Type-only
- * imports are exempt: `import type Swup from "swup"` needs the types at compile
- * time but emits no runtime import, so it cannot break a user's build and must
- * not be reported as a missing dependency.
- */
+/** Reduce a specifier to its package name for the dependency lookup. */
 function packageName(spec) {
 	if (spec.startsWith("@")) return spec.split("/").slice(0, 2).join("/");
 	return spec.split("/")[0];
 }
 
-const TYPE_ONLY = /\bimport\s+type\b/;
-
 const violations = new Map();
 for (const file of walk(SRC)) {
 	const source = readFileSync(file, "utf8");
-	for (const spec of bareSpecifiers(source)) {
+	for (const spec of runtimeSpecifiers(source)) {
 		if (isVirtual(spec)) continue;
 		const name = packageName(spec);
 		if (isBuiltin(name)) continue;
 		if (aliasPrefixes.some((p) => spec.startsWith(p))) continue;
-		if (integrationViteAliases.includes(spec)) continue;
 		if (declared.has(name)) continue;
-		if (TYPE_ONLY.test(source)) continue;
 		if (!violations.has(name)) violations.set(name, new Set());
 		violations.get(name).add(relative(ROOT, file));
 	}
