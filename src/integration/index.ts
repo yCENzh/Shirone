@@ -104,49 +104,6 @@ function createAliases(paths: ResolvedShironesPaths) {
  * `astro.config.mjs`: when the music widget is disabled the whole client bundle
  * is dropped instead of shipping dead code.
  */
-/**
- * Prefer a user-generated icon collection over the one baked into the package.
- *
- * `Icon.svelte` imports `@/generated/local-icon-collections`, and `@/` maps to
- * the package's own `src/`, so without this the collection is frozen at package
- * build time — an icon referenced only from a user's post would never be
- * included, and `generate-local-icons.mjs` would have nothing to point at.
- *
- * `scripts/icons/generate-local-icons.mjs` writes the user's copy to
- * `src/generated/local-icon-collections.ts`. When that file is absent the
- * package copy is used unchanged, so a project that never runs the generator
- * behaves exactly as before.
- */
-const USER_ICON_COLLECTIONS = "@/generated/local-icon-collections";
-
-function createUserIconCollectionsPlugin(paths: ResolvedShironesPaths) {
-	const userCopy = join(
-		paths.projectRoot,
-		"src",
-		"generated",
-		"local-icon-collections.ts",
-	);
-	const packageCopy = join(
-		paths.packageSrc,
-		"generated",
-		"local-icon-collections.ts",
-	);
-
-	return {
-		name: "shirones:user-icon-collections",
-		enforce: "pre" as const,
-		resolveId(source: string) {
-			// Checked per resolution rather than once at config time, so a file
-			// written after the dev server started is still picked up.
-			return source === USER_ICON_COLLECTIONS
-				? existsSync(userCopy)
-					? userCopy
-					: packageCopy
-				: null;
-		},
-	};
-}
-
 function createMusicSidebarPlugin(
 	paths: ResolvedShironesPaths,
 	enabled: boolean,
@@ -392,7 +349,6 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 							shironesFallbackResolver(paths),
 							shironesSsrNodeShims(),
 							createMusicSidebarPlugin(paths, musicEnabled),
-							createUserIconCollectionsPlugin(paths),
 							(await import("@tailwindcss/vite")).default(),
 						],
 						optimizeDeps: {
