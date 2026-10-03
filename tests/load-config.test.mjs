@@ -13,8 +13,8 @@ import { pathToFileURL } from "node:url";
 import {
 	invalidateConfigCache,
 	loadConfigModule,
-} from "../src/integration/load-config.ts";
-import { resolvePaths } from "../src/integration/paths.ts";
+} from "../src/integration/resolve/load-config.ts";
+import { resolvePaths } from "../src/integration/resolve/paths.ts";
 
 const roots = [];
 const world = () => {
