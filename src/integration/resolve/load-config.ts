@@ -9,13 +9,13 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { ResolvedShironesPaths } from "../types.ts";
 import {
 	createOverlayTargets,
 	type OverrideRegistryRef,
 	overrideKey,
 	resolveOverride,
 } from "./registry.ts";
-import type { ResolvedShironesPaths } from "./types.ts";
 
 /**
  * The integration needs values from user-authored TypeScript *before* Vite

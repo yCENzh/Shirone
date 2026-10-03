@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import type { ResolvedShironesPaths } from "../types.ts";
 import { normalisePath } from "./paths.ts";
-import type { ResolvedShironesPaths } from "./types.ts";
 
 /**
  * Extensions probed when a user override is looked up without one.
