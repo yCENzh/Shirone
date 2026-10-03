@@ -49,12 +49,19 @@ set; keep them in step.
 
 `Icon.svelte` writes the specifier `@/generated/local-icon-collections`, but by
 the time a plugin's `resolveId` runs, Vite has already rewritten it — to
-`projectRoot/src/...` in source mode (via tsconfig paths) and to `packageSrc/...`
-in package mode. `enforce: "pre"` does not change this.
+`packageRoot/src/...` in source mode (via tsconfig paths) and to
+`<package>/src/...` in package mode. `enforce: "pre"` does not change this.
 
-So `regeneration.ts` is not a virtual module; it writes a real file and the
-plugin only matches the path to skip regenerating on its own output. Matching
-the bare specifier alone would never fire.
+This is also why the collection is a real file rather than a virtual module.
+Serving it from `load()` needs the virtual id to parse as TypeScript (the
+generated source uses `as const`), and a generated module has to exist on disk
+for the packaging step's local-import check anyway.
+
+`regeneration.ts` writes the file and adds a `resolveId` that points
+`Icon.svelte` at it, falling back to the copy shipped in the package. That
+fallback is what makes the two modes behave the same: in package mode the alias
+resolves into `node_modules`, where this plugin must not write, so without the
+redirect a user's own posts would never reach the collection.
 
 ## Errors are swallowed on purpose
 

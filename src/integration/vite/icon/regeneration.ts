@@ -12,10 +12,14 @@
  * any import, so `Icon.svelte` cannot observe a missing module.
  */
 
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import type { ResolvedShironesPaths } from "../../types.ts";
-import { generateIconCollections } from "./collections.ts";
+import {
+	generateIconCollections,
+	ICON_COLLECTIONS_SPECIFIER,
+} from "./collections.ts";
 
 /** Only these can change the collection; everything else is ignored. */
 const SOURCE_EXTENSIONS = /\.(astro|md|mdx|svelte|ts|tsx)$/;
@@ -33,9 +37,14 @@ const DEBOUNCE_MS = 150;
 const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
 export function shironesIconRegeneration(paths: ResolvedShironesPaths): Plugin {
-	const outputPath = join(
+	const userCopy = join(
 		paths.projectRoot,
 		"src",
+		"generated",
+		"local-icon-collections.ts",
+	);
+	const packageCopy = join(
+		paths.packageSrc,
 		"generated",
 		"local-icon-collections.ts",
 	);
@@ -49,16 +58,37 @@ export function shironesIconRegeneration(paths: ResolvedShironesPaths): Plugin {
 			generateIconCollections({
 				projectRoot: paths.projectRoot,
 				roots,
-				outputPath,
+				outputPath: userCopy,
 			});
 		} catch {
-			// A typo in one post should cost that one icon, not take the dev
+			// A typo in one post should cost one icon, not take the dev
 			// server down. The previous collection stays in place.
 		}
 	};
 
 	return {
 		name: "shirone:icon-regeneration",
+
+		// `Icon.svelte` imports `@/generated/local-icon-collections`, and in
+		// package mode that alias points at `node_modules/shirones/src` — so the
+		// file this plugin writes would never be read. Redirect to the user's copy
+		// when it exists and fall back to the one shipped in the package.
+		//
+		// Vite resolves aliases before any plugin, so `source` arrives already
+		// rewritten: to the package path in package mode, and to
+		// `projectRoot/src/...` in source mode. Both forms are listed, along with
+		// the bare specifier, because which one shows up depends on how the
+		// theme is being consumed.
+		resolveId(source) {
+			if (
+				source !== ICON_COLLECTIONS_SPECIFIER &&
+				source !== withoutExtension(userCopy) &&
+				source !== withoutExtension(packageCopy)
+			) {
+				return null;
+			}
+			return existsSync(userCopy) ? userCopy : packageCopy;
+		},
 
 		buildStart() {
 			generate();
@@ -67,11 +97,16 @@ export function shironesIconRegeneration(paths: ResolvedShironesPaths): Plugin {
 		handleHotUpdate({ file }) {
 			// Writing the output re-triggers this handler; regenerating again
 			// would loop.
-			if (file === outputPath) return;
+			if (file === userCopy) return;
 			if (!SOURCE_EXTENSIONS.test(file)) return;
 
 			clearTimeout(pending.get(paths.projectRoot));
 			pending.set(paths.projectRoot, setTimeout(generate, DEBOUNCE_MS));
 		},
 	};
+}
+
+/** Vite hands plugins the specifier without its extension resolved. */
+function withoutExtension(path: string): string {
+	return path.replace(/\.ts$/, "");
 }

@@ -34,6 +34,9 @@ const ICON_PREFIXES = new Set([
 	"simple-icons",
 ]);
 
+/** The specifier `Icon.svelte` imports; see `regeneration.ts` for how it resolves. */
+export const ICON_COLLECTIONS_SPECIFIER = "@/generated/local-icon-collections";
+
 const SOURCE_EXTENSIONS = new Set([
 	".astro",
 	".md",
