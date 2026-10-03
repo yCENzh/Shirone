@@ -63,6 +63,23 @@ fallback is what makes the two modes behave the same: in package mode the alias
 resolves into `node_modules`, where this plugin must not write, so without the
 redirect a user's own posts would never reach the collection.
 
+### Verifying the redirect
+
+Delete the packaged copy and build — if it still succeeds, the user's file is
+what got read:
+
+```
+mv node_modules/shirones/src/generated/local-icon-collections.ts{,.bak}
+pnpm build   # must succeed
+```
+
+Confirm the consumer actually has the change first. `pnpm build` in the
+packaging repo only rewrites `dist/`; a throwaway consumer keeps the tarball it
+installed until it re-installs. Testing against a stale install makes a working
+redirect look broken — and `Icon.svelte` shipping as source is easy to miss,
+because `find node_modules/shirones -name Icon.svelte` follows no symlink under
+pnpm's layout and reports nothing while the file is there.
+
 ## Errors are swallowed on purpose
 
 `regeneration.ts` catches failures. A typo in one post should cost one icon,
