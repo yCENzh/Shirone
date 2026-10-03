@@ -85,7 +85,7 @@ Astro 图片优化有两类输入，不能混为一谈：
 - 需要水合的 Svelte 组件使用 `src/components/atoms/display/Icon.svelte`；它只消费 `src/generated/local-icon-collections.ts` 中的本地集合。
 - 禁止业务组件直接导入在线 Iconify 组件，避免首屏访问 Iconify API，也避免 SSR 阶段输出空图标。
 
-`src/integration/icon-collections.ts` 会扫描项目实际使用的图标名，从已安装的 `@iconify-json/*` 集合生成最小本地数据，产物写入 `src/generated/local-icon-collections.ts`。该文件在 `astro:config:setup` 自动重算，无需手动命令；但**图标名拼错不会自动修复**——生成器只在报错时跳过，Material Symbols 的错误名称不会因本地化而纠正。
+`src/integration/vite/icon/collections.ts` 会扫描项目实际使用的图标名，从已安装的 `@iconify-json/*` 集合生成最小本地数据，产物写入 `src/generated/local-icon-collections.ts`。该文件在 `astro:config:setup` 自动重算，无需手动命令；但**图标名拼错不会自动修复**——生成器只在报错时跳过，Material Symbols 的错误名称不会因本地化而纠正。
 
 图标回归至少应覆盖：
 
