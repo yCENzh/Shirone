@@ -348,9 +348,14 @@ test.describe("Markdown syntax runtime loading", () => {
 		await expect(facade.locator(".m3-youtube__poster")).toHaveCount(0);
 		await facade.scrollIntoViewIfNeeded();
 		await expect(facade.locator("iframe")).toHaveCount(1);
-		expect(playerRequests).toEqual([
-			"https://www.youtube-nocookie.com/embed/5gIf0_xpFPI?rel=0&modestbranding=1",
-		]);
+		// The player runtime is loaded on demand, so on a cold Vite cache the
+		// facade can render before its script hydrates. Poll instead of
+		// asserting once; a genuinely wrong src still fails within the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 15_000 })
+			.toEqual([
+				"https://www.youtube-nocookie.com/embed/5gIf0_xpFPI?rel=0&modestbranding=1",
+			]);
 		await expect(
 			page.locator('style[data-swup-optional="youtube"]'),
 		).toHaveCount(1);
@@ -377,9 +382,14 @@ test.describe("Markdown syntax runtime loading", () => {
 			"referrerpolicy",
 			"strict-origin-when-cross-origin",
 		);
-		expect(playerRequests).toEqual([
-			"https://www.youtube-nocookie.com/embed/5gIf0_xpFPI?rel=0&modestbranding=1",
-		]);
+		// The player runtime is loaded on demand, so on a cold Vite cache the
+		// facade can render before its script hydrates. Poll instead of
+		// asserting once; a genuinely wrong src still fails within the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 15_000 })
+			.toEqual([
+				"https://www.youtube-nocookie.com/embed/5gIf0_xpFPI?rel=0&modestbranding=1",
+			]);
 
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
