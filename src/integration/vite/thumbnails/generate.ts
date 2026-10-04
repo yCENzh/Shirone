@@ -34,6 +34,13 @@ export interface MomentThumbnailOptions {
 	sourceDir?: string;
 	/** Where thumbnails are written, relative to `projectRoot`. */
 	outputDir?: string;
+	/**
+	 * Remove existing thumbnails that no source image produces. Defaults to
+	 * `true` so dev and build drop stale outputs. `content:clean` passes
+	 * `false`: it treats thumbnails as exempt build-time artifacts and must
+	 * not delete them just because the repo has no moment images.
+	 */
+	prune?: boolean;
 }
 
 async function collectImages(directory: string): Promise<string[]> {
@@ -100,6 +107,7 @@ export async function generateMomentThumbnails({
 	projectRoot,
 	sourceDir = "public/images/moments",
 	outputDir = "public/assets/moments/thumbnails",
+	prune = true,
 }: MomentThumbnailOptions): Promise<MomentThumbnailResult> {
 	const sourceRoot = path.resolve(projectRoot, sourceDir);
 	const outputRoot = path.resolve(projectRoot, outputDir);
@@ -144,10 +152,12 @@ export async function generateMomentThumbnails({
 
 	await fs.mkdir(outputRoot, { recursive: true });
 	let removed = 0;
-	for (const outputPath of await collectImages(outputRoot)) {
-		if (expectedOutputs.has(path.resolve(outputPath).toLowerCase())) continue;
-		await fs.unlink(outputPath);
-		removed += 1;
+	if (prune) {
+		for (const outputPath of await collectImages(outputRoot)) {
+			if (expectedOutputs.has(path.resolve(outputPath).toLowerCase())) continue;
+			await fs.unlink(outputPath);
+			removed += 1;
+		}
 	}
 
 	await fs.writeFile(cachePath, `${JSON.stringify(nextCache, null, 2)}\n`);

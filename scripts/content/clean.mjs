@@ -690,7 +690,7 @@ if (workingCopyExists && !options.keepWorkingCopy) {
 // 7. 重新生成派生产物（图标集合与说说缩略图）
 // ─────────────────────────────────────────────────────────────────────────────
 
-function regenerate(step, label) {
+async function regenerate(step, label) {
 	try {
 		if (typeof step === "string") {
 			execFileSync("node", [step], {
@@ -699,7 +699,7 @@ function regenerate(step, label) {
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 		} else {
-			step();
+			await step();
 		}
 		return true;
 	} catch (error) {
@@ -728,7 +728,7 @@ const iconRegenerate = () =>
 		outputPath: join(ROOT, "src", "generated", "local-icon-collections.ts"),
 	});
 
-if (regenerate(iconRegenerate, "Offline icon collections")) {
+if (await regenerate(iconRegenerate, "Offline icon collections")) {
 	// 图标集合是被跟踪的生成物，且生成器一律写 LF。在 core.autocrlf=true 的
 	// Windows 检出上，内容完全一致的重写也会让 git status 显示 M。
 	// 内容没变就还原成检出时的形态，保证「清理后 git status 干净」这条承诺成立。
@@ -751,13 +751,16 @@ if (regenerate(iconRegenerate, "Offline icon collections")) {
 		);
 	}
 }
-regenerate(
+await regenerate(
 	// In-process rather than through a CLI script: `buildStart` already
 	// regenerates thumbnails, and the logic lives in
 	// `src/integration/vite/thumbnails/generate.ts`.
 	() =>
 		generateMomentThumbnails({
 			projectRoot: ROOT,
+			// Thumbnails are exempt build-time artifacts here, so never prune
+			// outputs that the (possibly just-emptied) content no longer implies.
+			prune: false,
 		}).then(() => undefined),
 	"Moments thumbnails",
 );
