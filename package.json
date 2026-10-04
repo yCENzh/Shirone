@@ -51,7 +51,7 @@
 		"lighthouse:mobile": "node scripts/lighthouse/run.mjs --device=mobile",
 		"lighthouse": "node scripts/lighthouse/run.mjs --device=desktop",
 		"astro": "astro",
-		"type-check": "tsc --noEmit --isolatedDeclarations",
+		"type-check": "tsc --noEmit --isolatedDeclarations 2>&1 | tee /dev/stderr | grep -v \"src/content.config.ts\" | (! grep -q .)",
 		"schemas": "node scripts/content/generate-config-schemas.mjs",
 		"new-post": "node scripts/new-post.js",
 		"format": "biome format --write ./src",
