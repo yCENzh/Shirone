@@ -14,6 +14,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -152,7 +153,12 @@ export async function generateMomentThumbnails({
 
 	await fs.mkdir(outputRoot, { recursive: true });
 	let removed = 0;
-	if (prune) {
+	// Pruning is only meaningful when the sources were actually read. A
+	// project with a custom content root has no `public/images/moments`, and
+	// treating "no sources" as "no thumbnails wanted" would delete every
+	// existing thumbnail on each dev/build.
+	const canPrune = prune && existsSync(sourceRoot);
+	if (canPrune) {
 		for (const outputPath of await collectImages(outputRoot)) {
 			if (expectedOutputs.has(path.resolve(outputPath).toLowerCase())) continue;
 			await fs.unlink(outputPath);

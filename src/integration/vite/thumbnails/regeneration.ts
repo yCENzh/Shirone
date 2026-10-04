@@ -61,8 +61,11 @@ export function shironesThumbnailsRegeneration(
 	return {
 		name: "shirone:thumbnails-regeneration",
 
-		buildStart() {
-			void generate();
+		// Awaited, not fired and forgotten: sharp work must finish before Vite
+		// starts copying `public/`, or a cold build can ship a partially
+		// written thumbnail directory.
+		async buildStart() {
+			await generate();
 		},
 
 		handleHotUpdate({ file }) {

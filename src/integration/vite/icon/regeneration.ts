@@ -4,12 +4,14 @@
  * Generation used to live only in the `dev` and `build` script chains, plus a
  * manual command. That made it easy to forget: an icon added to a
  * component or a post never reached the collection until the next chain ran.
- * `astro:config:setup` is the one hook every mode goes through — `astro dev`,
- * `astro build`, and `astro sync` — so generating there covers all three, and
+ * `buildStart` covers `astro dev` and `astro build` alike, and
  * `handleHotUpdate` covers edits made while the dev server is already up.
  *
- * Writing during `astro:config:setup` is safe: it happens before Vite resolves
- * any import, so `Icon.svelte` cannot observe a missing module.
+ * Writing during `buildStart` is safe: it happens before Vite resolves any
+ * import of the generated module, so `Icon.svelte` cannot observe a missing
+ * file. `astro sync` and `astro check` do not run `buildStart`, so they read
+ * whatever the last dev/build run left behind; run `pnpm dev` once after
+ * adding an icon to a component.
  */
 
 import { existsSync } from "node:fs";
@@ -36,7 +38,10 @@ const DEBOUNCE_MS = 150;
  */
 const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function shironesIconRegeneration(paths: ResolvedShironesPaths): Plugin {
+export function shironesIconRegeneration(
+	paths: ResolvedShironesPaths,
+	logger?: { warn: (message: string) => void },
+): Plugin {
 	const userCopy = join(
 		paths.projectRoot,
 		"src",
@@ -56,13 +61,19 @@ export function shironesIconRegeneration(paths: ResolvedShironesPaths): Plugin {
 	const generate = () => {
 		try {
 			generateIconCollections({
-				projectRoot: paths.projectRoot,
 				roots,
 				outputPath: userCopy,
 			});
-		} catch {
+		} catch (error) {
 			// A typo in one post should cost one icon, not take the dev
-			// server down. The previous collection stays in place.
+			// server down. The previous collection stays in place. Warn
+			// anyway: a swallowed error here means every icon silently
+			// renders blank, which is far harder to diagnose than a log line.
+			logger?.warn(
+				`[shirone] icon collection generation failed: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
 		}
 	};
 

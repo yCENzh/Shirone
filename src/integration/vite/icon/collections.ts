@@ -8,12 +8,10 @@
  * network request on every first paint, and one chunk per icon would mean one
  * request per glyph.
  *
- * The logic lives here rather than in the old standalone script
- * so both callers share one implementation: that script is now a thin CLI
- * wrapper, and the Vite plugin below calls this directly during `astro dev`.
- *
- * The integration is bundled into the published package, so package-mode
- * projects get the same behaviour without shipping `scripts/`.
+ * The logic lives here rather than in the old standalone script so the Vite
+ * plugin in `regeneration.ts` can call it directly, and so the integration
+ * stays bundled into the published package: package-mode projects get the
+ * same behaviour without shipping `scripts/`.
  */
 
 import {
@@ -24,9 +22,36 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, extname, join } from "node:path";
 
 /** Icon sets the theme is allowed to reference. Mirrors `src/config/integrationsConfig.ts`. */
+/**
+ * Locate an installed `@iconify-json/<prefix>/icons.json`.
+ *
+ * Resolution starts from this module so the theme's own icon sets are found
+ * whether the project runs from source or installs `shirones` from npm. Walks
+ * up the directory tree because pnpm's symlinked layout puts the real
+ * directory outside any obvious `node_modules/<pkg>` prefix.
+ */
+function resolveIconSetPath(prefix: string): string | null {
+	const require = createRequire(import.meta.url);
+	try {
+		return require.resolve(`@iconify-json/${prefix}/icons.json`);
+	} catch {
+		// Fall back to a manual walk for layouts where the package is not
+		// resolvable by name but is present on disk.
+		let dir = dirname(new URL(import.meta.url).pathname);
+		while (true) {
+			const candidate = join(dir, "node_modules", "@iconify-json", prefix, "icons.json");
+			if (existsSync(candidate)) return candidate;
+			const parent = dirname(dir);
+			if (parent === dir) return null;
+			dir = parent;
+		}
+	}
+}
+
 const ICON_PREFIXES: ReadonlySet<string> = new Set<string>([
 	"fa7-brands",
 	"fa7-solid",
@@ -67,8 +92,6 @@ function collectSourceFiles(directory: string): string[] {
 }
 
 export interface GenerateIconCollectionsOptions {
-	/** Project root; `@iconify-json/*` is read from its `node_modules`. */
-	projectRoot: string;
 	/** Directories to scan for `prefix:name` references. */
 	roots: string[];
 	/** Where to write the generated module. */
@@ -83,7 +106,6 @@ export interface GenerateIconCollectionsOptions {
  * inside the dev server are expected to catch — see `shironesIconRegeneration`.
  */
 export function generateIconCollections({
-	projectRoot,
 	roots,
 	outputPath,
 }: GenerateIconCollectionsOptions): number {
@@ -107,14 +129,11 @@ export function generateIconCollections({
 	for (const [prefix, names] of [...requested].sort(([a], [b]) =>
 		a.localeCompare(b),
 	)) {
-		const iconSetPath = join(
-			projectRoot,
-			"node_modules",
-			"@iconify-json",
-			prefix,
-			"icons.json",
-		);
-		if (!existsSync(iconSetPath)) {
+		// Resolve from this module, not from `projectRoot`. In package mode
+		// `projectRoot` is the user's project, which does not contain the
+		// theme's own devDependencies under pnpm's strict layout.
+		const iconSetPath = resolveIconSetPath(prefix);
+		if (!iconSetPath) {
 			throw new Error(
 				`[local-icons] Missing installed icon set @iconify-json/${prefix} for ${[...names][0]}`,
 			);

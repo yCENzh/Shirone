@@ -349,7 +349,7 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 										}),
 									]),
 							shironesFallbackResolver(paths),
-							shironesIconRegeneration(paths),
+							shironesIconRegeneration(paths, logger),
 							shironesThumbnailsRegeneration(paths),
 							shironesSsrNodeShims(),
 							createMusicSidebarPlugin(paths, musicEnabled),
