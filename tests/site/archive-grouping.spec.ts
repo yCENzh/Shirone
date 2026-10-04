@@ -57,8 +57,14 @@ test.describe("archive grouping switch", () => {
 			"Examples",
 			"Guides",
 		]);
+		// 计数由实际渲染的条目数派生，避免内容库增删文章时漂移。
+		const firstGroupEntries = await page
+			.locator(".m3-blog-archive__group")
+			.first()
+			.locator(".m3-blog-archive__item")
+			.count();
 		await expect(page.locator(".m3-blog-archive__count").first()).toHaveText(
-			"9 posts",
+			`${firstGroupEntries} posts`,
 		);
 	});
 
@@ -107,8 +113,21 @@ test.describe("archive grouping switch", () => {
 		await expect(
 			page.getByRole("group", { name: "Group archive by" }),
 		).toHaveCount(0);
-		// 直接呈现筛选后的年份时间轴
-		await expect(page.locator(".m3-blog-archive__item")).toHaveCount(9);
+		// 直接呈现筛选后的年份时间轴。Asserted by title rather than count: the
+		// Examples category gains posts as features are documented, so a literal
+		// number drifts without any filter behaviour changing.
+		await expect(
+			page.locator(".m3-blog-archive__title-text"),
+		).toHaveText([
+			"Password Protection and Post Encryption Demo",
+			"Audio Reader: Japanese Anime Mystery Voices",
+			"Image Gallery Grid: Syntax and Complete Examples",
+			"Mermaid Diagram Gallery",
+			"Expressive Code Example",
+			"Markdown Example",
+			"Include Video in the Posts",
+			"Draft Example",
+		]);
 		await expect(page.locator(".m3-blog-archive__group-title")).toHaveText([
 			"2026",
 			"2024",
