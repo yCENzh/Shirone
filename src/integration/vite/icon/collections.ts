@@ -27,7 +27,7 @@ import {
 import { dirname, extname, join } from "node:path";
 
 /** Icon sets the theme is allowed to reference. Mirrors `src/config/integrationsConfig.ts`. */
-const ICON_PREFIXES = new Set([
+const ICON_PREFIXES: ReadonlySet<string> = new Set<string>([
 	"fa7-brands",
 	"fa7-solid",
 	"material-symbols",
@@ -37,7 +37,7 @@ const ICON_PREFIXES = new Set([
 /** The specifier `Icon.svelte` imports; see `regeneration.ts` for how it resolves. */
 export const ICON_COLLECTIONS_SPECIFIER = "@/generated/local-icon-collections";
 
-const SOURCE_EXTENSIONS = new Set([
+const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set<string>([
 	".astro",
 	".md",
 	".mdx",

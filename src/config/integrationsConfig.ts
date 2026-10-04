@@ -115,7 +115,7 @@ export const swupOptions: NonNullable<Parameters<typeof swup>[0]> = {
  */
 export const swupForwardOptions = {
 	animateHistoryBrowsing: false,
-	skipPopStateHandling: (event: { state?: { url?: string } }) =>
+	skipPopStateHandling: (event: { state?: { url?: string } }): boolean =>
 		Boolean(event.state?.url?.includes("#")),
 };
 
@@ -200,7 +200,7 @@ export function svelteCompilerOptions(isDev: boolean) {
 			`svelte-${hash(css)}`,
 		// Keep repeated Svelte compiler diagnostics out of the dev terminal;
 		// check/build still surface the full warning set in CI.
-		warningFilter: () => !isDev,
+		warningFilter: (): boolean => !isDev,
 	};
 }
 
@@ -259,7 +259,7 @@ export const viteBuildShared: NonNullable<
  * 根解析这些 id，看不见主题自己的嵌套依赖，列一个解析不了的 id 会让每次冷启动
  * 都刷一条警告。
  */
-export const prebundleSpecifiers = [
+export const prebundleSpecifiers: string[] = [
 	"mermaid",
 	"@panzoom/panzoom",
 	"overlayscrollbars",
