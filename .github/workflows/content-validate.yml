@@ -97,8 +97,8 @@ jobs:
           CONTENT_DIR: ${{ github.workspace }}/content
         run: |
           set -euo pipefail
-pnpm content:sync
-            pnpm exec astro sync
+          pnpm content:sync
+          pnpm exec astro sync
 
       - name: Summarize
         if: always()
