@@ -14,7 +14,9 @@ test("code blocks resolve the configured mono font family", async ({ page }) => 
 		await document.fonts.ready;
 	});
 
-	const styles = await page.locator("pre.expressive-code").first().evaluate((element) => {
+	// expressive-code 0.44 renders `div.expressive-code > pre.wrap`; the old
+	// `pre.expressive-code` selector matched nothing.
+	const styles = await page.locator("pre.wrap").first().evaluate((element) => {
 		const root = getComputedStyle(document.documentElement);
 		const block = getComputedStyle(element);
 		return {

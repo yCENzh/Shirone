@@ -238,7 +238,9 @@ test.describe("article discovery page", () => {
 		await expect(discovery).toBeVisible();
 		const layout = await discovery.evaluate((element) => ({
 			insidePost: Boolean(
-				document.querySelector("#post-container")?.contains(element),
+				document
+					.querySelector("#swup-container")
+					?.contains(element),
 			),
 			overflows: element.scrollWidth > element.clientWidth,
 		}));
