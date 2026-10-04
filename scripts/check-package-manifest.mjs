@@ -181,6 +181,12 @@ function packageName(spec) {
 
 const violations = new Map();
 for (const file of walk(SRC)) {
+	// A declaration file is never emitted and never executed, so a bare
+	// import in one cannot break an installed package — including a
+	// side-effect import like `import "@swup/scroll-plugin"` in
+	// `src/global.d.ts`, which the theme does not need at runtime because
+	// `@swup/astro` registers its own scroll plugin.
+	if (file.endsWith(".d.ts")) continue;
 	const source = readFileSync(file, "utf8");
 	for (const spec of runtimeSpecifiers(source)) {
 		if (isVirtual(spec)) continue;
