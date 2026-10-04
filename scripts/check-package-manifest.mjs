@@ -29,14 +29,10 @@ const MANIFEST = join(SRC, "integration", "package.manifest.json");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 
 /** Every dependency the package can legitimately satisfy at runtime. */
-const declared = new Set([
-	...Object.keys(pkg.dependencies ?? {}),
-	...Object.keys(pkg.peerDependencies ?? {}),
-	// devDependencies are installed in source mode, so an import satisfied only
-	// by one is exactly the case to catch — except when the manifest says the
-	// packaging repo ships it, which is recorded separately below.
-	...Object.keys(pkg.devDependencies ?? {}),
-]);
+  const declared = new Set([
+  	...Object.keys(pkg.dependencies ?? {}),
+  	...Object.keys(pkg.peerDependencies ?? {}),
+  ]);
 
 let manifest;
 try {
@@ -131,16 +127,27 @@ function runtimeSpecifiers(source) {
 	const code = stripComments(source);
 	const out = new Set();
 
-	// `import type … from "x"`, and the `{ … } from "x"` block form. Matched first
-	// and collected separately so the runtime pass can subtract them.
-	const typeOnly = new Set();
+// `import type … from "x"`, and the `{ … } from "x"` block form. Their
+	// specifiers are collected with the source offset of the type-only statement
+	// so the runtime pass can tell a specifier apart by *which statement* used
+	// it. A file-level Set is not enough: one `import type … from "x"` would
+	// waive every runtime `from "x"` in the same file.
+	const typeOnlyRanges = [];
 	const typePatterns = [
 		/\bimport\s+type\s+[^;'"]*?\bfrom\s*["']([^"']+)["']/g,
 		/\bexport\s+type\s+[^;'"]*?\bfrom\s*["']([^"']+)["']/g,
 	];
 	for (const re of typePatterns) {
-		for (const m of code.matchAll(re)) typeOnly.add(m[1]);
+		for (const m of code.matchAll(re)) {
+			typeOnlyRanges.push({ spec: m[1], start: m.index, end: m.index + m[0].length });
+		}
 	}
+
+	/** True when this occurrence of `spec` sits inside a type-only statement. */
+	const isTypeOnlyOccurrence = (spec, index) =>
+		typeOnlyRanges.some(
+			(range) => range.spec === spec && index >= range.start && index < range.end,
+		);
 
 	const patterns = [
 		/\bfrom\s*["']([^"']+)["']/g,
@@ -152,12 +159,12 @@ function runtimeSpecifiers(source) {
 		for (const m of code.matchAll(re)) {
 			const spec = m[1];
 			if (spec.startsWith(".") || spec.startsWith("/")) continue;
-			if (typeOnly.has(spec)) continue;
+			if (isTypeOnlyOccurrence(spec, m.index)) continue;
 			out.add(spec);
 		}
 	}
 	return out;
-}
+  }
 
 /** Remove line and block comments. Good enough for specifier extraction. */
 function stripComments(source) {
