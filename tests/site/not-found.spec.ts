@@ -8,17 +8,9 @@ async function expectNotFoundShell(page: import("@playwright/test").Page) {
 	await expect(page.locator("#swup-container h1")).toHaveText(
 		"This page wandered off",
 	);
-	// The sidebar renders outside the Swup container, so its `hidden` markers are
-	// applied by a client-side pass. On a cold Vite cache that pass can land
-	// after `domcontentloaded`; poll rather than asserting once.
-	await expect
-		.poll(() =>
-			page
-				.locator('[data-sidebar-pages="home"]')
-				.first()
-				.evaluate((element) => element.classList.contains("hidden")),
-		)
-		.toBe(true);
+	await expect(page.locator('[data-sidebar-pages="home"]').first()).toHaveClass(
+		/hidden/,
+	);
 }
 
 test.describe("404 route", () => {
