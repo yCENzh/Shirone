@@ -14,9 +14,14 @@ test("code blocks resolve the configured mono font family", async ({ page }) => 
 		await document.fonts.ready;
 	});
 
-	// expressive-code 0.44 renders `div.expressive-code > pre.wrap`; the old
-	// `pre.expressive-code` selector matched nothing.
-	const styles = await page.locator("pre.wrap").first().evaluate((element) => {
+	// Scope through the documented `.expressive-code` root rather than a class
+	// from the renderer internals: 0.44 emits `div.expressive-code > figure
+	// > pre.wrap`, and `wrap` is absent on some blocks (26 of 27 here), so
+	// keying on it both drifted and matched the wrong subset.
+	const styles = await page
+		.locator(".expressive-code pre")
+		.first()
+		.evaluate((element) => {
 		const root = getComputedStyle(document.documentElement);
 		const block = getComputedStyle(element);
 		return {
