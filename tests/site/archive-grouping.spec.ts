@@ -57,15 +57,25 @@ test.describe("archive grouping switch", () => {
 			"Examples",
 			"Guides",
 		]);
-		// 计数由实际渲染的条目数派生，避免内容库增删文章时漂移。
-		const firstGroupEntries = await page
-			.locator(".m3-blog-archive__group")
+		// Compare the rendered number against the rendered entries instead of
+		// building an expected string: the label is produced by the component's
+		// own `countLabel`, which is localised and pluralised, so any literal
+		// here would be a guess that only holds for the current content.
+		const firstGroup = page.locator(".m3-blog-archive__group").first();
+		const rendered = await firstGroup
+			.locator(".m3-blog-archive__count")
 			.first()
-			.locator(".m3-blog-archive__item")
-			.count();
-		await expect(page.locator(".m3-blog-archive__count").first()).toHaveText(
-			`${firstGroupEntries} posts`,
-		);
+			.evaluate((element) => {
+				const match = element.textContent?.match(/\d+/);
+				return {
+					count: match ? Number.parseInt(match[0], 10) : null,
+					entries:
+						element
+							.closest(".m3-blog-archive__group")
+							?.querySelectorAll(".m3-blog-archive__item").length ?? -1,
+				};
+			});
+		expect(rendered.count).toBe(rendered.entries);
 	});
 
 	test("switches grouping to tag, sorted by name with hash prefix", async ({
@@ -116,9 +126,7 @@ test.describe("archive grouping switch", () => {
 		// 直接呈现筛选后的年份时间轴。Asserted by title rather than count: the
 		// Examples category gains posts as features are documented, so a literal
 		// number drifts without any filter behaviour changing.
-		await expect(
-			page.locator(".m3-blog-archive__title-text"),
-		).toHaveText([
+		await expect(page.locator(".m3-blog-archive__title-text")).toHaveText([
 			"Password Protection and Post Encryption Demo",
 			"Audio Reader: Japanese Anime Mystery Voices",
 			"Image Gallery Grid: Syntax and Complete Examples",
