@@ -290,7 +290,12 @@ test.describe("Markdown syntax runtime loading", () => {
 		await expect(facade.locator(".m3-acfun__poster")).toHaveCount(0);
 		await facade.scrollIntoViewIfNeeded();
 		await expect(facade.locator("iframe")).toHaveCount(1);
-		expect(playerRequests).toEqual(["https://www.acfun.cn/player/ac48649632"]);
+		// The player runtime loads on demand, so the request can lag the
+		// iframe on a cold Vite cache. Poll rather than asserting once; a
+		// wrong src still fails inside the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 8_000 })
+			.toEqual(["https://www.acfun.cn/player/ac48649632"]);
 		await expect(page.locator('style[data-swup-optional="acfun"]')).toHaveCount(
 			1,
 		);
@@ -317,7 +322,12 @@ test.describe("Markdown syntax runtime loading", () => {
 			"referrerpolicy",
 			"strict-origin-when-cross-origin",
 		);
-		expect(playerRequests).toEqual(["https://www.acfun.cn/player/ac48649632"]);
+		// The player runtime loads on demand, so the request can lag the
+		// iframe on a cold Vite cache. Poll rather than asserting once; a
+		// wrong src still fails inside the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 8_000 })
+			.toEqual(["https://www.acfun.cn/player/ac48649632"]);
 
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
@@ -420,9 +430,14 @@ test.describe("Markdown syntax runtime loading", () => {
 		await expect(facade.locator(".m3-bilibili__poster")).toHaveCount(0);
 		await facade.scrollIntoViewIfNeeded();
 		await expect(facade.locator("iframe")).toHaveCount(1);
-		expect(playerRequests).toEqual([
-			"https://player.bilibili.com/player.html?bvid=BV1fK4y1s7Qf&p=1&high_quality=1&danmaku=0",
-		]);
+		// The player runtime loads on demand, so the request can lag the
+		// iframe on a cold Vite cache. Poll rather than asserting once; a
+		// wrong src still fails inside the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 15_000 })
+			.toEqual([
+				"https://player.bilibili.com/player.html?bvid=BV1fK4y1s7Qf&p=1&high_quality=1&danmaku=0",
+			]);
 		await expect(
 			page.locator('style[data-swup-optional="bilibili"]'),
 		).toHaveCount(1);
@@ -449,9 +464,14 @@ test.describe("Markdown syntax runtime loading", () => {
 			"referrerpolicy",
 			"strict-origin-when-cross-origin",
 		);
-		expect(playerRequests).toEqual([
-			"https://player.bilibili.com/player.html?bvid=BV1fK4y1s7Qf&p=1&high_quality=1&danmaku=0",
-		]);
+		// The player runtime loads on demand, so the request can lag the
+		// iframe on a cold Vite cache. Poll rather than asserting once; a
+		// wrong src still fails inside the timeout.
+		await expect
+			.poll(() => playerRequests, { timeout: 15_000 })
+			.toEqual([
+				"https://player.bilibili.com/player.html?bvid=BV1fK4y1s7Qf&p=1&high_quality=1&danmaku=0",
+			]);
 
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
