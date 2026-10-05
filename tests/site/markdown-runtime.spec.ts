@@ -165,9 +165,12 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
+		// Swup prunes optional resources during its render settle; against
+		// PLAIN_POST_PATH the marker can survive about five seconds, which is
+		// exactly the default retry budget.
 		await expect(
 			page.locator('style[data-swup-optional="artplayer"]'),
-		).toHaveCount(0);
+		).toHaveCount(0, { timeout: 15_000 });
 	});
 
 	test("renders Audio Reader as a compact speaker control without preloading", async ({
@@ -267,9 +270,12 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
+		// Swup prunes optional resources during its render settle; against
+		// PLAIN_POST_PATH the marker can survive about five seconds, which is
+		// exactly the default retry budget.
 		await expect(
 			page.locator('style[data-swup-optional="audio-reader"]'),
-		).toHaveCount(0);
+		).toHaveCount(0, { timeout: 15_000 });
 	});
 
 	test("preloads the AcFun player near the viewport and cleans styles on navigation", async ({
@@ -332,8 +338,16 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
+		// Swup prunes the outgoing page's optional resources during its render
+		// settle, so the element disappears a beat after the URL changes. How
+		// long that beat is depends on how much the incoming page has to lay
+		// out: measured against /posts/admonitions/ the marker survives roughly
+		// five seconds, which is exactly the default retry budget.
 		await expect(page.locator('style[data-swup-optional="acfun"]')).toHaveCount(
 			0,
+			{
+				timeout: 15_000,
+			},
 		);
 		await expect(
 			page.locator("#swup-container [data-acfun] iframe"),
@@ -404,9 +418,12 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
+		// Swup prunes optional resources during its render settle; against
+		// PLAIN_POST_PATH the marker can survive about five seconds, which is
+		// exactly the default retry budget.
 		await expect(
 			page.locator('style[data-swup-optional="youtube"]'),
-		).toHaveCount(0);
+		).toHaveCount(0, { timeout: 15_000 });
 		await expect(
 			page.locator("#swup-container [data-youtube] iframe"),
 		).toHaveCount(0);
@@ -476,9 +493,12 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await page.evaluate((path) => window.swup?.navigate(path), PLAIN_POST_PATH);
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
+		// Swup prunes optional resources during its render settle; against
+		// PLAIN_POST_PATH the marker can survive about five seconds, which is
+		// exactly the default retry budget.
 		await expect(
 			page.locator('style[data-swup-optional="bilibili"]'),
-		).toHaveCount(0);
+		).toHaveCount(0, { timeout: 15_000 });
 		await expect(
 			page.locator("#swup-container [data-bilibili] iframe"),
 		).toHaveCount(0);
@@ -830,6 +850,7 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await expect(page.locator('style[data-swup-optional="trees"]')).toHaveCount(
 			0,
+			{ timeout: 15_000 },
 		);
 		expect(
 			hasRequestFor(requests, [
@@ -865,6 +886,7 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
 		await expect(page.locator('style[data-swup-optional="trees"]')).toHaveCount(
 			0,
+			{ timeout: 15_000 },
 		);
 	});
 
@@ -976,6 +998,7 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForFunction(() => Boolean(window.swup?.navigate));
 		await expect(page.locator('style[data-swup-optional="steps"]')).toHaveCount(
 			0,
+			{ timeout: 15_000 },
 		);
 		expect(hasRequestFor(requests, [optionalRuntimeModules.steps])).toBe(false);
 
@@ -992,6 +1015,7 @@ test.describe("Markdown syntax runtime loading", () => {
 		await page.waitForURL(`**${PLAIN_POST_PATH}`);
 		await expect(page.locator('style[data-swup-optional="steps"]')).toHaveCount(
 			0,
+			{ timeout: 15_000 },
 		);
 	});
 
