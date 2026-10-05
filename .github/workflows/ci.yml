@@ -89,6 +89,12 @@ jobs:
       - name: Check isolated declarations
         run: pnpm type-check
 
+
+      # Catches a bare import that only a devDependency satisfies: source mode
+      # installs devDependencies so the theme still builds, but the published
+      # package does not ship them and a user's project fails mid-build.
+      - name: Validate package dependency manifest
+        run: pnpm check:package-manifest
       - name: Run unit tests
         run: node --test "tests/**/*.test.mjs"
 
