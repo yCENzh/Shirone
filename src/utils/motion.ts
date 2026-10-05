@@ -223,7 +223,13 @@ export async function fadeOutThenHide(
 	try {
 		await anim.finished;
 	} catch {
-		// Ownership passed to a newer collection sync; leave visibility unchanged.
+		// The animation was cancelled. Callers only pass elements that must
+		// end up hidden, so the settled state is still `hidden` — leaving it
+		// out is what strands a widget visible when its route no longer wants
+		// it. A newer collection sync that cancelled this will find the
+		// element already hidden, which is consistent.
+		el.classList.add("hidden");
+		anim.cancel();
 		return;
 	}
 	el.classList.add("hidden");
