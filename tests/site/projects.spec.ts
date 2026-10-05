@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { registerPersistentShellSync } from "./feature-page";
 
 const PROJECT_COUNT = 3;
 
@@ -214,24 +215,11 @@ test.describe("项目页", () => {
 test.describe("项目页 Swup 导航", () => {
 	test.use({ viewport: { width: 1280, height: 900 } });
 
-	test("从持久顶栏进入后同步页面、导航与侧栏状态", async ({ page }) => {
-		await page.goto("/skills/", { waitUntil: "domcontentloaded" });
-		await page.getByRole("button", { name: "More", exact: true }).click();
-		await page.locator('a[data-nav-key="projects"]').click();
-
-		await expect(page).toHaveURL(/\/projects\/$/);
-		await expect(page.locator("#swup-container")).toHaveAttribute(
-			"data-current-page",
-			"projects",
-		);
-		await expect(page.locator(".project-card")).toHaveCount(PROJECT_COUNT);
-		await expect(page.locator('a[data-nav-key="projects"]')).toHaveAttribute(
-			"aria-current",
-			"page",
-		);
-		await expect(
-			page.locator('widget-layout[data-id="categories"]'),
-		).toBeVisible();
-		await expect(page.locator('widget-layout[data-id="tags"]')).toBeVisible();
+	registerPersistentShellSync("从持久顶栏进入后同步页面、导航与侧栏状态", {
+		key: "projects",
+		fromPath: "/skills/",
+		toPath: /\/projects\/$/,
+		cardSelector: "project-card",
+		cardCount: PROJECT_COUNT,
 	});
 });
