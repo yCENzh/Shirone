@@ -29,10 +29,10 @@ const MANIFEST = join(SRC, "integration", "package.manifest.json");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 
 /** Every dependency the package can legitimately satisfy at runtime. */
-  const declared = new Set([
-  	...Object.keys(pkg.dependencies ?? {}),
-  	...Object.keys(pkg.peerDependencies ?? {}),
-  ]);
+const declared = new Set([
+	...Object.keys(pkg.dependencies ?? {}),
+	...Object.keys(pkg.peerDependencies ?? {}),
+]);
 
 let manifest;
 try {
@@ -127,7 +127,7 @@ function runtimeSpecifiers(source) {
 	const code = stripComments(source);
 	const out = new Set();
 
-// `import type … from "x"`, and the `{ … } from "x"` block form. Their
+	// `import type … from "x"`, and the `{ … } from "x"` block form. Their
 	// specifiers are collected with the source offset of the type-only statement
 	// so the runtime pass can tell a specifier apart by *which statement* used
 	// it. A file-level Set is not enough: one `import type … from "x"` would
@@ -139,14 +139,19 @@ function runtimeSpecifiers(source) {
 	];
 	for (const re of typePatterns) {
 		for (const m of code.matchAll(re)) {
-			typeOnlyRanges.push({ spec: m[1], start: m.index, end: m.index + m[0].length });
+			typeOnlyRanges.push({
+				spec: m[1],
+				start: m.index,
+				end: m.index + m[0].length,
+			});
 		}
 	}
 
 	/** True when this occurrence of `spec` sits inside a type-only statement. */
 	const isTypeOnlyOccurrence = (spec, index) =>
 		typeOnlyRanges.some(
-			(range) => range.spec === spec && index >= range.start && index < range.end,
+			(range) =>
+				range.spec === spec && index >= range.start && index < range.end,
 		);
 
 	const patterns = [
@@ -164,7 +169,7 @@ function runtimeSpecifiers(source) {
 		}
 	}
 	return out;
-  }
+}
 
 /** Remove line and block comments. Good enough for specifier extraction. */
 function stripComments(source) {

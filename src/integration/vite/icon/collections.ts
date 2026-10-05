@@ -24,8 +24,8 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-/** Icon sets the theme is allowed to reference. Mirrors `src/config/integrationsConfig.ts`. */
 /**
  * Locate an installed `@iconify-json/<prefix>/icons.json`.
  *
@@ -41,9 +41,18 @@ function resolveIconSetPath(prefix: string): string | null {
 	} catch {
 		// Fall back to a manual walk for layouts where the package is not
 		// resolvable by name but is present on disk.
-		let dir = dirname(new URL(import.meta.url).pathname);
+		// fileURLToPath, not `new URL(...).pathname`: the latter skips
+		// percent-decoding, so a checkout path containing a space, `#` or
+		// non-ASCII character would yield a path that does not exist.
+		let dir = dirname(fileURLToPath(import.meta.url));
 		while (true) {
-			const candidate = join(dir, "node_modules", "@iconify-json", prefix, "icons.json");
+			const candidate = join(
+				dir,
+				"node_modules",
+				"@iconify-json",
+				prefix,
+				"icons.json",
+			);
 			if (existsSync(candidate)) return candidate;
 			const parent = dirname(dir);
 			if (parent === dir) return null;
@@ -52,6 +61,10 @@ function resolveIconSetPath(prefix: string): string | null {
 	}
 }
 
+/**
+ * Icon sets the theme is allowed to reference.
+ * Mirrors `src/config/integrationsConfig.ts`.
+ */
 const ICON_PREFIXES: ReadonlySet<string> = new Set<string>([
 	"fa7-brands",
 	"fa7-solid",

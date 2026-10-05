@@ -63,7 +63,8 @@ const violations = diagnostics.filter(
 	(diagnostic) =>
 		!ALLOWED.some(
 			(entry) =>
-				diagnostic.file === entry.file || diagnostic.file.endsWith(`/${entry.file}`),
+				diagnostic.file === entry.file ||
+				diagnostic.file.endsWith(`/${entry.file}`),
 		),
 );
 
@@ -71,7 +72,8 @@ const allowedSeen = diagnostics.length - violations.length;
 for (const entry of ALLOWED) {
 	const seen = diagnostics.filter(
 		(diagnostic) =>
-			diagnostic.file === entry.file || diagnostic.file.endsWith(`/${entry.file}`),
+			diagnostic.file === entry.file ||
+			diagnostic.file.endsWith(`/${entry.file}`),
 	).length;
 	console.log(
 		`[type-check] ${entry.file}: ${seen} known diagnostic(s) tolerated — ${entry.reason}`,
@@ -92,12 +94,32 @@ if (result.error) {
 	process.exit(1);
 }
 
+// A compiler-level failure (bad tsconfig option, unreadable file, …) is
+// reported without a `(line,col)`, so it never becomes a diagnostic and
+// would otherwise pass unnoticed. A non-zero exit with nothing captured
+// means the run told us something we failed to understand — treat it as a
+// failure rather than as a clean tree.
+if (result.status !== 0 && diagnostics.length === 0) {
+	console.error(
+		`[type-check] ✗ tsc exited ${result.status} without a recognisable diagnostic.`,
+	);
+	console.error(
+		"[type-check]   A configuration-level failure carries no file position, so it",
+	);
+	console.error(
+		"[type-check]   cannot be filtered by path. Treat this as a failure.",
+	);
+	process.exit(1);
+}
+
 if (violations.length > 0) {
 	console.error(
 		`[type-check] ✗ ${violations.length} error(s) beyond the documented exception:`,
 	);
 	for (const diagnostic of violations) {
-		console.error(`    ${diagnostic.file}  ${diagnostic.code}  ${diagnostic.text.split("\n")[0].slice(0, 160)}`);
+		console.error(
+			`    ${diagnostic.file}  ${diagnostic.code}  ${diagnostic.text.split("\n")[0].slice(0, 160)}`,
+		);
 	}
 	process.exit(1);
 }
