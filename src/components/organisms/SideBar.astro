@@ -287,6 +287,13 @@ const hasVisibleSticky = stickyWidgets.some(isVisible);
 	}
 
 	function onSwupReplace(): void {
+		// Swup does not always reach `visit:start` — its visit routine bails
+		// early when a navigation is already in flight — but `content:replace`
+		// means the containers were swapped either way. That is the signal
+		// this sidebar needs, so mark the navigation active here too; otherwise
+		// `finishNavigation` bails and the widgets keep their SSR visibility
+		// until the next full page load.
+		navigationActive = true;
 		sidebarSyncPending = true;
 	}
 
@@ -323,6 +330,21 @@ const hasVisibleSticky = stickyWidgets.some(isVisible);
 		}
 	}
 
+	// `bindSwupHooks` runs on every attempt and returns early while
+	// `window.swup` is still undefined. This script executes before the Swup
+	// client is guaranteed to exist, so the `swup:enable` listener below is
+	// the only thing that rescues that case — and it is not reliably
+	// dispatched. Polling until it appears is what actually closes the race:
+	// without it the sidebar silently keeps its SSR visibility for every
+	// client-side navigation that happens to start before Swup is ready.
 	bindSwupHooks();
 	document.addEventListener("swup:enable", bindSwupHooks, { once: true });
+	if (typeof window !== "undefined" && !window.__shironeSidebarBound) {
+		const retry = (): void => {
+			if (window.__shironeSidebarBound) return;
+			bindSwupHooks();
+			if (!window.__shironeSidebarBound) window.setTimeout(retry, 50);
+		};
+		window.setTimeout(retry, 50);
+	}
 </script>
