@@ -106,8 +106,17 @@ activate-post-grid()
 		el.setAttribute("data-layout-mode", m);
 	}
 	if (m !== "grid") return;
-	var cols = getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length;
-	if (cols <= 1) return;
+	var style = getComputedStyle(el);
+	var template = style.gridTemplateColumns;
+	/* 与 masonry.ts 同样早退：容器（或祖先）display:none 时子元素量到 0px，
+	   由此算出的 span 是错的，等可见后由 ResizeObserver 重排。 */
+	if (!template || template === "none") return;
+	var cols = template.split(" ").filter(Boolean).length;
+	if (cols === 0) return;
+	/* 与 masonry.ts 同一判断：≥md 把 16px 行距烘焙进 span，单列也必须写 span；
+	   低于断点 grid-auto-rows 为 auto、行距是真实 gap，单列保持默认 span 即可。 */
+	var baked = style.gridAutoRows !== "auto" && style.gridAutoRows !== "normal";
+	if (cols === 1 && !baked) return;
 	var heights = new Array(cols).fill(0);
 	var cards = el.children;
 	for (var i = 0; i < cards.length; i++) {

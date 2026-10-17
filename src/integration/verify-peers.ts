@@ -11,13 +11,24 @@ import { join } from "node:path";
  *
  * 1. `astro` — the project *is* an Astro project; its own `astro.config.mjs`
  *    imports it, and every Astro integration is loaded through it.
- * 2. `svelte` + `@astrojs/svelte` — `@astrojs/svelte` registers `svelte/*` and
- *    `@astrojs/svelte/client.js` in `optimizeDeps.include`, which Vite resolves
- *    from the **project root**. Missing either one leaves Svelte islands
- *    unhydrated while the page still renders, so the failure is silent.
+ * 2. `svelte` + `@astrojs/svelte` — the project's `astro.config.mjs` imports
+ *    `@astrojs/svelte` to register the integration, and that package lists
+ *    `svelte` as a **peer dependency**. Both therefore resolve from the
+ *    **project root**, not from inside the installed theme. Missing either one
+ *    leaves Svelte islands unhydrated while the page still renders, so the
+ *    failure is silent.
  * 3. `sharp` — Astro's image service `import`s it dynamically from its own
  *    location, which never reaches the theme's nested `node_modules`, and its
  *    `@img/*` native bindings must be version-matched to the JS wrapper.
+ *
+ * `@astrojs/svelte` does reach back into Vite's optimisation config — its
+ * `configEnvironment` returns `optimizeDeps.exclude: ["svelte"]` so
+ * `@sveltejs/vite-plugin-svelte` skips pre-bundling Svelte's SSR runtime, which
+ * would otherwise give dev SSR two separate copies with independent
+ * `ssr_context` state. That is not why the peer has to sit at the project root,
+ * though: the `optimizeDeps` entry only *names* `svelte`, and the name resolves
+ * wherever the hoisted layout puts it. The root dependency is what the
+ * config-file import and the peer relationship require.
  *
  * The `@iconify-json/*` sets used to be a fourth entry: `astro-icon` located
  * them by reading the *user's* `package.json`, which made them unshippable no
@@ -58,13 +69,13 @@ export const PEER_REQUIREMENTS: readonly PeerRequirement[] = [
 		name: "svelte",
 		tier: "runtime",
 		reason:
-			"`@astrojs/svelte` registers `svelte/*` in Vite's `optimizeDeps.include`, which is resolved from the project root",
+			"`@astrojs/svelte` (which `astro.config.mjs` imports) declares `svelte` a peer dependency, so it must resolve from the project root",
 	},
 	{
 		name: "@astrojs/svelte",
 		tier: "runtime",
 		reason:
-			"registers its hydration client in `optimizeDeps.include`, so Svelte islands stay server-only without it",
+			"`astro.config.mjs` imports it to register the integration, so it must resolve from the project root",
 	},
 	{
 		name: "sharp",
@@ -96,45 +107,227 @@ export interface PeerViolation {
 	stale: boolean;
 }
 
-/** A dependency's version floor as [major, minor, patch], or null. */
-function rangeFloor(range: unknown): [number, number, number] | null {
-	if (typeof range !== "string") return null;
-	const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(range);
-	if (!match) return null;
-	return [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
+/** A `[major, minor, patch]` triple, or null when it cannot be read. */
+type Version = [number, number, number];
+
+interface Bound {
+	version: Version;
+	inclusive: boolean;
 }
 
-/** Whether floor `a` is strictly below floor `b`. Null floors are "unknown". */
-function floorBelow(
-	a: [number, number, number] | null,
-	b: [number, number, number] | null,
-): boolean {
-	if (!a || !b) return false;
+/** A contiguous version interval. A null bound means "unbounded in that direction". */
+interface Interval {
+	low: Bound | null;
+	high: Bound | null;
+}
+
+/** Anything unparseable or `*`-like means "no constraint", never a violation. */
+const UNBOUNDED: Interval = { low: null, high: null };
+
+function compareVersions(a: Version, b: Version): number {
 	for (let index = 0; index < 3; index += 1) {
-		if (a[index] !== b[index]) return a[index] < b[index];
+		if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
 	}
-	return false;
+	return 0;
+}
+
+function parseVersion(raw: unknown): Version | null {
+	if (typeof raw !== "string") return null;
+	const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(raw.trim());
+	if (!match) return null;
+	return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+/** Reads a `>`, `>=`, `<` or `<=` range into a one-sided interval. */
+function comparisonBound(text: string, operator: string): Interval | null {
+	// Matched against the whole text, operator included. Stripping the operator
+	// first and then matching a pattern that requires it would never match,
+	// which turns every `<x` range into "unbounded" and silently passes.
+	const match = new RegExp(
+		`^${operator}\\s*v?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?`,
+	).exec(text);
+	if (!match) return null;
+	const version: Version = [
+		Number(match[1]),
+		Number(match[2] ?? 0),
+		Number(match[3] ?? 0),
+	];
+	return operator.startsWith(">")
+		? { low: { version, inclusive: operator === ">=" }, high: null }
+		: { low: null, high: { version, inclusive: operator === "<=" } };
 }
 
 /**
- * `true` when the declared range cannot satisfy the required one.
- *
- * Ranges are compared by floor, which is what matters in practice: a caret
- * range that starts below the theme's floor will resolve to a version the
- * theme has never seen. A range with no numeric floor (`*`, `latest`,
- * `workspace:`) is taken as satisfying, since there is nothing to compare and
- * refusing to install is worse than a warning nobody can act on.
+ * `^x.y.z` as an interval, following caret semantics including the two 0.x
+ * rules: `^0.2.3` stops before `0.3.0`, and `^0.0.3` stops before `0.0.4`.
+ * Those rules are the whole reason a floor comparison cannot decide this.
  */
-function isStale(declared: unknown, required: unknown): boolean {
-	return floorBelow(rangeFloor(declared), rangeFloor(required));
+function caretInterval([major, minor, patch]: Version): Interval {
+	const low: Bound = { version: [major, minor, patch], inclusive: true };
+	if (major > 0)
+		return { low, high: { version: [major + 1, 0, 0], inclusive: false } };
+	if (minor > 0)
+		return { low, high: { version: [0, minor + 1, 0], inclusive: false } };
+	return { low, high: { version: [0, 0, patch + 1], inclusive: false } };
 }
 
-/** Turn `"pnpm add -D x@^1"` into something safe to paste into a shell. */
-function installCommand(names: string[], ranges: Map<string, string>): string {
+/** A bare `1`, `1.2` or `1.2.3`, where a missing part means "up to the next one". */
+function fixedOrPartialInterval(text: string): Interval | null {
+	const match = /^v?(\d+|x|\*)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?$/.exec(text);
+	if (!match) return null;
+	const isWild = (part: string | undefined) =>
+		part === undefined || part === "x" || part === "*";
+	if (isWild(match[1])) return UNBOUNDED;
+	const major = Number(match[1]);
+	if (isWild(match[2])) {
+		return {
+			low: { version: [major, 0, 0], inclusive: true },
+			high: { version: [major + 1, 0, 0], inclusive: false },
+		};
+	}
+	const minor = Number(match[2]);
+	if (isWild(match[3])) {
+		return {
+			low: { version: [major, minor, 0], inclusive: true },
+			high: { version: [major, minor + 1, 0], inclusive: false },
+		};
+	}
+	const patch = Number(match[3]);
+	return {
+		low: { version: [major, minor, patch], inclusive: true },
+		high: { version: [major, minor, patch], inclusive: true },
+	};
+}
+
+/**
+ * Reads a single, simple range into an interval.
+ *
+ * Compound ranges (`||`) and anything unrecognised come back as `UNBOUNDED`,
+ * which never produces a violation. Failing a build the user cannot act on is
+ * worse than letting an unusual declaration through, so every branch here
+ * errs toward "no constraint".
+ */
+function parseInterval(range: unknown): Interval {
+	if (typeof range !== "string") return UNBOUNDED;
+	const text = range.trim();
+	if (
+		text === "" ||
+		text === "*" ||
+		text === "x" ||
+		text === "latest" ||
+		text.startsWith("workspace:") ||
+		text.startsWith("file:") ||
+		text.startsWith("link:") ||
+		text.startsWith("npm:") ||
+		text.includes("||")
+	) {
+		return UNBOUNDED;
+	}
+
+	for (const operator of [">=", "<=", ">", "<"]) {
+		if (text.startsWith(operator)) {
+			return comparisonBound(text, operator) ?? UNBOUNDED;
+		}
+	}
+	if (text.startsWith("^")) {
+		const version = parseVersion(text.slice(1));
+		return version ? caretInterval(version) : UNBOUNDED;
+	}
+	if (text.startsWith("~")) {
+		const version = parseVersion(text.slice(1));
+		if (!version) return UNBOUNDED;
+		return {
+			low: { version, inclusive: true },
+			high: { version: [version[0], version[1] + 1, 0], inclusive: false },
+		};
+	}
+	return fixedOrPartialInterval(text) ?? UNBOUNDED;
+}
+
+/** Whether `version` falls inside `interval`. An unreadable version matches. */
+function satisfies(version: Version | null, interval: Interval): boolean {
+	if (!version) return true;
+	if (interval.low) {
+		const compared = compareVersions(version, interval.low.version);
+		if (compared < 0 || (compared === 0 && !interval.low.inclusive))
+			return false;
+	}
+	if (interval.high) {
+		const compared = compareVersions(version, interval.high.version);
+		if (compared > 0 || (compared === 0 && !interval.high.inclusive))
+			return false;
+	}
+	return true;
+}
+
+/**
+ * Whether some version can satisfy both intervals at once.
+ *
+ * This is what a floor comparison gets wrong in both directions: `^7.3.0` and
+ * `^7.3.5` share versions (7.3.5 onward), while `^0.36.0` and `^0.35.5` share
+ * none, because a 0.x caret does not cross a minor boundary. Comparing floors
+ * rejects the first and accepts the second.
+ */
+function intervalsIntersect(a: Interval, b: Interval): boolean {
+	// When both sides name the same bound, the intersection keeps the
+	// *tighter* inclusivity: an inclusive and an exclusive bound at `8.0.0`
+	// leave only a single point, exclusive on both ends — no version at all.
+	// Picking either side's bound verbatim there would silently widen the
+	// result and let `8.0.0` pass for `^7.3.5`.
+	let low: Bound | null;
+	if (a.low && b.low) {
+		const compared = compareVersions(a.low.version, b.low.version);
+		low =
+			compared === 0
+				? {
+						version: a.low.version,
+						inclusive: a.low.inclusive && b.low.inclusive,
+					}
+				: compared > 0
+					? a.low
+					: b.low;
+	} else {
+		low = a.low ?? b.low;
+	}
+
+	let high: Bound | null;
+	if (a.high && b.high) {
+		const compared = compareVersions(a.high.version, b.high.version);
+		high =
+			compared === 0
+				? {
+						version: a.high.version,
+						inclusive: a.high.inclusive && b.high.inclusive,
+					}
+				: compared < 0
+					? a.high
+					: b.high;
+	} else {
+		high = a.high ?? b.high;
+	}
+
+	if (!low || !high) return true;
+	const compared = compareVersions(low.version, high.version);
+	if (compared > 0) return false;
+	// Equal bounds only leave a gap when both exclude it.
+	return compared === 0 ? low.inclusive && high.inclusive : true;
+}
+
+/** Turn `"pnpm add x@^1"` into something safe to paste into a shell. */
+function installCommand(
+	names: string[],
+	ranges: Map<string, string>,
+	projectRoot: string,
+): string {
 	const specs = names.map((name) => `${name}@${ranges.get(name) ?? "latest"}`);
-	const manager = existsSync(join(process.cwd(), "pnpm-lock.yaml"))
-		? "pnpm add -D"
-		: "npm install -D";
+	// `projectRoot`, not `process.cwd()`: the integration runs wherever the
+	// user's shell happens to be, and only the project root knows which
+	// package manager owns the lockfile. `-D` is deliberately absent —
+	// `shirones init` writes these into `dependencies`, and a `--omit=dev`
+	// deploy would otherwise ship without `astro`.
+	const manager = existsSync(join(projectRoot, "pnpm-lock.yaml"))
+		? "pnpm add"
+		: "npm install";
 	return `${manager} ${specs.join(" ")}`;
 }
 
@@ -145,6 +338,20 @@ function readPackageJson(file: string): Record<string, unknown> | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * The version actually installed for the project, or null when it is not.
+ *
+ * A symlink under pnpm's strict layout, so `readFileSync` following it is what
+ * finds the real package.json. A missing directory is a normal answer — the
+ * project is simply not installed yet — and not an error to report.
+ */
+function installedVersion(projectRoot: string, name: string): string | null {
+	const pkg = readPackageJson(
+		join(projectRoot, "node_modules", ...name.split("/"), "package.json"),
+	);
+	return typeof pkg?.version === "string" ? pkg.version : null;
 }
 
 /**
@@ -220,30 +427,54 @@ export function verifyPeerRequirements(
 	for (const requirement of PEER_REQUIREMENTS) {
 		const range = required.get(requirement.name) ?? null;
 		// No range means the theme cannot say what it needs — a manifest that
-		// predates a dependency, or one that dropped it. Reporting "missing"
-		// there would be a warning the user cannot act on.
+		// predates a dependency, or one that dropped it. Reporting anything
+		// there would be a message the user cannot act on.
 		if (range === null) continue;
+
 		const declaredRange = declared[requirement.name];
-		if (typeof declaredRange === "string") {
-			if (isStale(declaredRange, range)) {
-				violations.push({
-					name: requirement.name,
-					tier: requirement.tier,
-					reason: requirement.reason,
-					required: range,
-					declared: declaredRange,
-					stale: true,
-				});
-			}
+		if (typeof declaredRange !== "string") {
+			violations.push({
+				name: requirement.name,
+				tier: requirement.tier,
+				reason: requirement.reason,
+				required: range,
+				declared: null,
+				stale: false,
+			});
 			continue;
 		}
+
+		// Ground truth first: what is actually on disk. An installed version
+		// inside the requirement settles it without reasoning about ranges,
+		// which is the common case and also the one that never false-kills.
+		const installed = installedVersion(projectRoot, requirement.name);
+		const wanted = parseInterval(range);
+		if (installed !== null) {
+			if (satisfies(parseVersion(installed), wanted)) continue;
+			violations.push({
+				name: requirement.name,
+				tier: requirement.tier,
+				reason: requirement.reason,
+				required: range,
+				declared: `${declaredRange} (installed ${installed})`,
+				stale: true,
+			});
+			continue;
+		}
+
+		// Nothing installed yet, so the only evidence is the declared range.
+		// Passing here means the range *can* resolve to a version the theme
+		// supports — which is all a manifest can promise before a lockfile.
+		if (intervalsIntersect(parseInterval(declaredRange), wanted)) continue;
+
+		// The ranges provably share no version, so no install can satisfy both.
 		violations.push({
 			name: requirement.name,
 			tier: requirement.tier,
 			reason: requirement.reason,
 			required: range,
-			declared: null,
-			stale: false,
+			declared: declaredRange,
+			stale: true,
 		});
 	}
 	return violations;
@@ -257,10 +488,14 @@ export function verifyPeerRequirements(
  * the package and the wanted range and says nothing about why the range exists
  * or what to run. This is the version that tells the user what is missing, why
  * only the theme can know, and the exact command that fixes it.
+ *
+ * `projectRoot` is needed only to name the right package manager in that
+ * command; the violations themselves carry everything else.
  */
 export function reportPeerViolations(
 	violations: PeerViolation[],
 	logger: { error: (message: string) => void; warn: (message: string) => void },
+	projectRoot: string,
 ): boolean {
 	if (violations.length === 0) return false;
 
@@ -282,12 +517,21 @@ export function reportPeerViolations(
 	}
 
 	if (runtime.length > 0) {
-		const lines = runtime.map((violation) => {
-			const detail = violation.stale
-				? `declares ${violation.declared}, needs ${violation.required}`
-				: "missing";
-			return `  - ${violation.name} (${detail})\n    ${violation.reason}`;
-		});
+		// "missing" and "out of date" need different fixes: one is a `pnpm add`
+		// that does not touch what is there, the other is a version bump. The
+		// old wording called both of them "missing".
+		const absent = runtime.filter((violation) => !violation.stale);
+		const stale = runtime.filter((violation) => violation.stale);
+		const lines = [
+			...absent.map(
+				(violation) =>
+					`  - not declared: ${violation.name}\n    ${violation.reason}`,
+			),
+			...stale.map(
+				(violation) =>
+					`  - out of date: ${violation.name} declares ${violation.declared}, the theme needs ${violation.required}\n    ${violation.reason}`,
+			),
+		];
 		const ranges = new Map(
 			runtime.map((violation) => [
 				violation.name,
@@ -297,11 +541,12 @@ export function reportPeerViolations(
 		const command = installCommand(
 			runtime.map((violation) => violation.name),
 			ranges,
+			projectRoot,
 		);
 		logger.error(
 			`${runtime.length} required ${
 				runtime.length === 1 ? "dependency is" : "dependencies are"
-			} missing from this project:\n${lines.join("\n")}\n` +
+			} unusable in this project:\n${lines.join("\n")}\n` +
 				"  pnpm prints an unmet peer warning for these, but it does not say that the\n" +
 				"  build will fail. Install them, or run `npx shirones init --update`:\n" +
 				`    ${command}`,

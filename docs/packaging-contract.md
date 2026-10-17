@@ -108,8 +108,13 @@ onto the user's project:
 | Mechanism | Packages | Why bundling fails |
 | --- | --- | --- |
 | Imported by the user's own config | `astro` | the project *is* an Astro project |
-| Registered in `optimizeDeps.include` | `svelte`, `@astrojs/svelte` | Vite resolves that list from the project root, so a nested copy is invisible and islands silently stay server-side |
+| Imported by the user's config **and** declared a peer by it | `svelte`, `@astrojs/svelte` | `astro.config.mjs` imports `@astrojs/svelte` to register the integration, and that package names `svelte` a peer dependency — so both resolve from the project root, and a nested copy stays invisible to pnpm's peer resolution |
 | Imported by Astro itself, dynamically | `sharp` | Astro's image service resolves it from its own location; the `@img/*` bindings must also be version-matched |
+
+`@astrojs/svelte` does place a `optimizeDeps.exclude: ["svelte"]` entry, but
+that is not the reason for the peer: the entry only *names* `svelte`, and the
+name resolves wherever the resolved layout puts it. The root dependency is
+required by the config-file import and the peer relationship, not by that list.
 
 Plus `@astrojs/check` and `typescript`, which only `astro check` needs — they
 are declared so the command works right after `init`, not because a build
@@ -145,7 +150,7 @@ tooling-only cases.
 | --- | --- |
 | A route in `src/pages/` | Nothing. `routes.ts` discovers it and `injectRoute`s it. Non-HTML endpoints (`*.txt.ts`, `*.xml.ts`) are handled. |
 | A config module in `src/config/` | Nothing, if it follows the existing shape — the template picks it up and its relative imports are rewritten. Keep it exporting through the `src/config/index.ts` barrel. |
-| An integration option (swup, astro-icon, expressive-code, svelte, mdx, or the shared `vite.build` keys) | Put it in `src/config/integrationsConfig.ts`, not in the wiring. The integration — the single Astro config entry point for source mode and package mode alike — reads it, so one edit covers both. Do **not** export it through the barrel and do **not** route it through `withUserConfig` — package mode bundles this file at build time, so it has no user-overlay layer. Wiring (aliases, `preprocess`, `optimizeDeps`, `vite.plugins`, expressive-code `themes`/`plugins`) stays in `src/integration/index.ts`, where per-mode branches are commented. |
+| An integration option (swup, expressive-code, svelte, mdx, or the shared `vite.build` keys) | Put it in `src/config/integrationsConfig.ts`, not in the wiring. The integration — the single Astro config entry point for source mode and package mode alike — reads it, so one edit covers both. Do **not** export it through the barrel and do **not** route it through `withUserConfig` — package mode bundles this file at build time, so it has no user-overlay layer. Wiring (aliases, `preprocess`, `optimizeDeps`, `vite.plugins`, expressive-code `themes`/`plugins`) stays in `src/integration/index.ts`, where per-mode branches are commented. |
 | A content collection | Three things, all in this repo. Export its schema from `src/integration/collections.ts` (name it `<singular>Schema`), declare it in `src/content.config.ts` with `glob({ base: "./src/content/<key>", … })`, and add one entry to `src/integration/collections.manifest.json`. `tests/collections-manifest.test.mjs` fails if those three disagree. The pipeline reads that manifest to generate a package-mode user's `content.config.ts`, and copies `src/content/` recursively, so **shirones needs no change**. |
 | A data module in `src/data/` | Nothing. It is scaffolded to `shirones/config/data/`. Remember imports of `../config/x` become `../x` there. |
 | A component or layout | Nothing for it to work; it becomes overridable automatically. |

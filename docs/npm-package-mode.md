@@ -145,25 +145,25 @@ pnpm's strict layout, so the source repository never sees them:
   resolution is genuine (the file exists; no `vite:alias.noResolved` sentinel)
   before standing down.
 
-- **Node-level `require.resolve`** — astro-icon loads icon sets outside Vite, so
-  `@iconify-json/*` must really exist in the user's project. They are peer
-  dependencies and `init` installs them. Same story for `sharp`, which Astro's
-  image service imports dynamically.
+- **Node-level `require.resolve`** — `sharp` and `stylus` are peer dependencies
+  the user's project must really install: `init` adds them, and
+  `check:package-manifest` fails a bare import that only
+  `dependencies`/`peerDependencies` can satisfy at runtime. Astro's image
+  service imports `sharp` dynamically for the same reason.
 
-  Do not read that as a *resolution* problem and move the iconify sets into the
-  theme's `dependencies` to fix it. They resolve fine from inside the package —
-  verified with a real tarball install: both the theme's own
-  `src/integration/vite/icon/collections.ts` (which anchors on
+  The icon sets follow that rule too, with one difference that came out of
+  dropping `astro-icon`: `@iconify-json/*` are now the **theme's own**
+  `dependencies`, not peers. They used to have to be peers only because
+  astro-icon's *detection* step — `detectInstalledCollections(root)` reads the
+  **user's** `package.json` and iterates only that list — dropped any set the
+  user had not declared, even though the file itself resolved fine. A real
+  tarball install verified that resolution was never the blocker: both the
+  theme's `src/integration/vite/icon/collections.ts` (which anchors on
   `createRequire(import.meta.url)`) and astro-icon's fs loader (which anchors on
-  `process.cwd()`) find the sibling `node_modules` under pnpm's layout. What
-  breaks is astro-icon's *detection* step: `detectInstalledCollections(root)`
-  reads the **user's** `package.json` and only iterates that list, so the sets
-  go missing from the virtual `astro-icon` module even though the files are
-  reachable — every `<Icon name="material-symbols:home">` then throws. See
-  `docs/troubleshooting.md` in the packaging repository. The theme-side
-  `localIconCollections` path (used by `Icon.svelte` and the
-  `@shirone/iconify-offline` component) has no such gate, which is what makes it
-  the escape hatch if astro-icon is ever dropped.
+  `process.cwd()`) find the sibling `node_modules` under pnpm's strict layout.
+  With that discovery step gone, the sets resolve from inside the package and
+  need no user-side declaration at all. See `docs/troubleshooting.md` in the
+  packaging repository.
 - **CommonJS deps that get inlined into the SSR bundle** — `stylus` reads
   `__dirname` and then loads `lib/functions/index.styl` from disk.
   `src/integration/vite/ssr-node-shims.ts` gives every bundled CJS module its real
