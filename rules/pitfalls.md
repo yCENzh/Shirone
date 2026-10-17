@@ -599,3 +599,39 @@ snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg
 **解法**：这几个步骤**串行**跑，每步单独占满内存；同时跑两个必假阳性。判断「是不是我的改动引起的」—— 同一条命令在未改动提交上再跑一遍，结果一致即为环境问题。
 
 
+### 11.3 `astro check` 不检查 `.svelte`，`.svelte` 因此长期无人检查
+
+**现象**：`Icon.svelte.d.ts` 把 `Icon` 声明成 Svelte 4 的 `SvelteComponent<IconProps>`，
+`astro check` 报 0 errors，而 `svelte-check` 在 64 个 `.svelte` 文件里报 164 条
+「not assignable to parameter of type 'Component<…>'」——也就是每一个 `<Icon>` 调用点。
+
+**根因**：`astro check` 只跑 `.astro` 的 language server，不加载 `svelte-check`。
+实测在 `.svelte` 里写 `const bad: number = "x"`、在 `.astro` 里写
+`<Icon icon={123} notARealProp="x" />`，`astro check` 都仍是 0 errors。
+所以任何 `.d.ts` 或类型改动，只要 CI 里没有 `svelte-check`，就没有守门人。
+
+**现状**：`svelte-check` 会用 `pnpm dlx`，测得 28 errors（迁移前基线 48，最差 164），
+但**没有**进 `ci.yml`。没进的原因是要先清到 0（`--threshold error` 没有「允许 N 条」的
+开关），剩下的是 `progress` possibly undefined（10 条）、组件参数隐式 any（5 条）等，
+与图标改动无关。清它是一项独立的技术债提交。
+
+**判断**：改 `.svelte`/`.svelte.d.ts` 时，`astro check` 通过**不构成**类型验证证据；
+必须另跑 `pnpm dlx svelte-check@4 --threshold error --output human` 并和基线数字对比。
+
+### 11.4 Playwright 测试不在 CI，回归只能靠源码级契约兜住
+
+**现象**：`1cd5466` 的图标迁移漏了 4 个跨行 `<Icon name=…>` 标签，导致文章卡片箭头、
+相关文章条目箭头、系列卡片箭头在 `dist/` 里是空节点。这类遗漏 `icons.spec.ts` 覆盖不到
+（它只检查顶栏、社交链接、复制按钮、FAB），而 `astro check` 又看不到属性名。
+
+**根因**：`playwright.config.ts` 写死 `channel: "chrome"`，且 `ci.yml` 没有 `pnpm test`，
+所以浏览器测试只能手工跑。
+
+**解法**：对「属性名换掉会导致静默空渲染」这类问题，用**源码级契约测试**兜：
+`tests/icon-call-site-contract.test.mjs` 扫描每个 `.astro`/`.svelte`，屏蔽注释与字符串
+字面量后断言 `<Icon>` 带 `icon` 且不带 `name`。这比 Playwright 更早、更便宜，且
+`icons.spec.ts` 只能作为渲染质量的补充。
+
+**教训**：源码级契约测试的关键是**先屏蔽注释与字符串**。第一版没屏蔽，
+`Icon.svelte` 自己的 deprecation 文案、JSDoc 里的 `<Icon … />` 示例全被当成调用点，
+67 个假阳性——一条没人看的测试比没有测试更糟。

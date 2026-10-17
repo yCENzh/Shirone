@@ -1,7 +1,10 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import type { ResolvedShironesPaths } from "../types.ts";
 import { normalisePath } from "./paths.ts";
+
+/** Only files that can carry an import are worth opening. */
+const SOURCE_EXTENSIONS = /\.(astro|svelte|ts|tsx|mjs|js)$/;
 
 /**
  * Extensions probed when a user override is looked up without one.
@@ -14,7 +17,12 @@ export const CONFIG_EXTENSIONS: string[] = [".ts", ".mts", ".js", ".mjs"];
  * overridable despite the comment claiming otherwise.
  */
 const BARREL_RE = /(?:^|\/)index\.(ts|js|mts|mjs)$/;
-export const COMPONENT_EXTENSIONS: string[] = [".astro", ".svelte", ".ts", ".js"];
+export const COMPONENT_EXTENSIONS: string[] = [
+	".astro",
+	".svelte",
+	".ts",
+	".js",
+];
 
 /** Strip a known source extension from a path. */
 function stripExtension(path: string): string {
@@ -240,4 +248,37 @@ export function findOrphanUserFiles(paths: ResolvedShironesPaths): string[] {
 	}
 
 	return orphans.sort();
+}
+
+/** The package a project has to drop to be on the current icon pipeline. */
+const LEGACY_ICON_IMPORT = "astro-icon";
+
+/**
+ * Overridden files that still import the removed `astro-icon` package.
+ *
+ * Scoped to overrides only, never to the project's own components: a file the
+ * user copied out of the theme and edited carries the theme's imports with it,
+ * so a surviving one there is a real migration signal. A file the user wrote
+ * themselves is their business, and reporting it would cry wolf on ordinary
+ * code — which is why `findOrphanUserFiles` keeps away from `src/components`
+ * for the same reason.
+ *
+ * Reading only registered overrides keeps this cheap: a project that customises
+ * nothing scans nothing.
+ */
+export function findLegacyIconImports(
+	overrides: ReadonlyMap<string, string>,
+): string[] {
+	const found: string[] = [];
+	for (const userCopy of overrides.values()) {
+		if (!SOURCE_EXTENSIONS.test(userCopy)) continue;
+		try {
+			if (readFileSync(userCopy, "utf8").includes(LEGACY_ICON_IMPORT))
+				found.push(userCopy);
+		} catch {
+			// An unreadable file is a resolution problem the registry already
+			// reports; it is not a reason to fail a build.
+		}
+	}
+	return found.sort();
 }

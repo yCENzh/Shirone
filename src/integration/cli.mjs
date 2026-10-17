@@ -338,6 +338,16 @@ async function ensurePackageJson(
 		[packageName]: version ? `^${version}` : "latest",
 	};
 
+	// The theme used to declare nothing of its own and asked the project to
+	// install the icon sets, so an older project still carries four of them in
+	// package.json with no code that resolves them from there any more. A new
+	// project never gets them, which made "the user declares none" true only
+	// for a fresh install. Removing them here keeps an existing project honest
+	// rather than leaving dead weight behind on every upgrade.
+	const obsolete = new Set(ICONIFY_SET_PACKAGES);
+	for (const name of Object.keys(peers)) obsolete.delete(name);
+	const removedDeps = [];
+
 	const addedDeps = [];
 	const upgradedDeps = [];
 	for (const [dep, range] of Object.entries(wantedDeps)) {
@@ -357,6 +367,22 @@ async function ensurePackageJson(
 		pkg.dependencies[dep] = range;
 		addedDeps.push(dep);
 		changed = true;
+	}
+
+	// Only now, after `wantedDeps` had its chance to bump a range: dropping an
+	// obsolete set the project still needs would break it, and `obsolete` was
+	// already narrowed to the sets no peer demands.
+	for (const dep of obsolete) {
+		if (pkg.dependencies[dep]) {
+			delete pkg.dependencies[dep];
+			removedDeps.push(dep);
+			changed = true;
+		}
+		if (pkg.devDependencies[dep]) {
+			delete pkg.devDependencies[dep];
+			removedDeps.push(dep);
+			changed = true;
+		}
 	}
 
 	const wanted = {
@@ -407,8 +433,30 @@ async function ensurePackageJson(
 			`bumped ${dep} ${from} -> ${to} — the declared version no longer satisfies the theme`,
 		);
 	}
-	return [...addedDeps, ...upgradedDeps.map((d) => d.dep)];
+	for (const dep of removedDeps) {
+		log.warn(
+			`removed ${dep} — the theme no longer resolves icon sets from the project, so nothing needs it`,
+		);
+	}
+	// Removals are returned as well, so an upgrade that only drops dependencies
+	// still triggers the reinstall that actually prunes them from node_modules.
+	return [...addedDeps, ...upgradedDeps.map((d) => d.dep), ...removedDeps];
 }
+
+/**
+ * The icon-set packages the theme used to require of the project.
+ *
+ * Kept as an explicit list rather than a `@iconify-json/*` glob so the message
+ * names them and so a package the user adds under that scope for their own
+ * purposes is never touched.
+ */
+const ICONIFY_SET_PACKAGES = [
+	"@iconify-json/fa7-brands",
+	"@iconify-json/fa7-solid",
+	"@iconify-json/material-symbols",
+	"@iconify-json/simple-icons",
+	"@iconify-json/twemoji",
+];
 
 /** Read the theme's declared peer dependencies. */
 async function themePeers() {
