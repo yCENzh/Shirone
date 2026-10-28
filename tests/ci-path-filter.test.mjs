@@ -16,9 +16,8 @@ import { fileURLToPath } from "node:url";
 const CLASSIFIER = fileURLToPath(
 	new URL("../scripts/ci/classify-browser-suites.sh", import.meta.url),
 );
-const HAS_BASH =
-	process.platform !== "win32" &&
-	spawnSync("bash", ["--version"], { stdio: "ignore" }).status === 0;
+const WORKFLOW = fileURLToPath(new URL("../.github/workflows/ci.yml", import.meta.url));
+const HAS_BASH = spawnSync("bash", ["--version"], { stdio: "ignore" }).status === 0;
 
 function git(cwd, ...args) {
 	return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -78,6 +77,21 @@ function assertClassification(options, expected) {
 	);
 }
 
+test("workflow forces both browser suites when the classifier changes", () => {
+	const workflow = readFileSync(WORKFLOW, "utf8");
+	const guard = workflow.indexOf(
+		'if ! git diff --quiet "$base" "$head" -- scripts/ci/classify-browser-suites.sh; then',
+	);
+	const classifierCall = workflow.indexOf(
+		'scripts/ci/classify-browser-suites.sh "$base" "$head" "$GITHUB_OUTPUT"',
+	);
+	assert.notEqual(guard, -1, "workflow must check the classifier path directly");
+	assert.ok(guard < classifierCall, "self-change guard must run before the classifier");
+	const guardBody = workflow.slice(guard, classifierCall);
+	assert.match(guardBody, /comments=true/);
+	assert.match(guardBody, /styles=true/);
+});
+
 test("changed-path browser classifier handles Git paths and fails closed", { skip: !HAS_BASH }, async (t) => {
 	const both = { comments: "true", styles: "true" };
 	const cases = [
@@ -89,6 +103,7 @@ test("changed-path browser classifier handles Git paths and fails closed", { ski
 		["Biome config", ["biome.json"], both],
 		["Pagefind config", ["pagefind.yml"], both],
 		["frontmatter config", ["frontmatter.json"], both],
+		["example content config", ["shirone.content.example.json"], both],
 		["Vercel config", ["vercel.json"], both],
 		["Lighthouse config", ["lighthouserc.cjs"], both],
 		["Astro config", ["astro.config.mjs"], both],
@@ -97,6 +112,7 @@ test("changed-path browser classifier handles Git paths and fails closed", { ski
 		["pnpm workspace config", ["pnpm-workspace.yaml"], both],
 		["site browser tests", ["tests/site/comments.spec.ts"], both],
 		["nested CI scripts", ["scripts/ci/another-classifier.sh"], both],
+		["classifier self-change", ["scripts/ci/classify-browser-suites.sh"], both],
 		["fixture-only change", ["tests/fixtures/waline-options.ts"], { comments: "true", styles: "false" }],
 		["fixture config remains comment-only", ["tests/fixtures/content/waline/config/site.config.ts"], { comments: "true", styles: "false" }],
 		["fixture plus docs still selects comments only", ["tests/fixtures/waline-options.ts", "docs/guide.md"], { comments: "true", styles: "false" }],
