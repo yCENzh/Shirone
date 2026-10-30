@@ -68,13 +68,9 @@ test.describe("文章内系列块", () => {
 				"href",
 				"/posts/markdown-enhancements/",
 			);
-			await expect(prev).toHaveAttribute(
-				"aria-label",
-				"Markdown Example Part 1 of 3 — Previous in series",
-			);
-			await expect(next).toHaveAttribute(
-				"aria-label",
-				"Shirone Markdown Enhancements Part 3 of 3 — Next in series",
+			await expect(prev).toHaveAccessibleName("Markdown Example Part 1 of 3");
+			await expect(next).toHaveAccessibleName(
+				"Shirone Markdown Enhancements Part 3 of 3",
 			);
 			await expect(prev).toContainText("Part 1 of 3");
 			await expect(next).toContainText("Part 3 of 3");
