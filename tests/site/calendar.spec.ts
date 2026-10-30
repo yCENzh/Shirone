@@ -120,7 +120,10 @@ test.describe("sidebar calendar widget", () => {
 			.locator(".m3-calendar__day--has-posts")
 			.first();
 		await expect(postDay).toBeVisible();
-		await expect(postDay).toHaveAttribute("aria-label", "2024-05-01，1 篇文章");
+		await expect(postDay).toHaveAttribute(
+			"aria-label",
+			"1, Wednesday, May 1, 2024，1 篇文章",
+		);
 
 		// 展开：panel 高度 > 0，文章链接出现
 		await postDay.click();
