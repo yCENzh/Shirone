@@ -70,11 +70,11 @@ test.describe("文章内系列块", () => {
 			);
 			await expect(prev).toHaveAttribute(
 				"aria-label",
-				"Previous in series: Markdown Example",
+				"Markdown Example Part 1 of 3 — Previous in series",
 			);
 			await expect(next).toHaveAttribute(
 				"aria-label",
-				"Next in series: Shirone Markdown Enhancements",
+				"Shirone Markdown Enhancements Part 3 of 3 — Next in series",
 			);
 			await expect(prev).toContainText("Part 1 of 3");
 			await expect(next).toContainText("Part 3 of 3");

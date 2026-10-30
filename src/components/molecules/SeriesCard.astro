@@ -105,7 +105,7 @@ const directionLabel = {
 					<a
 						class={`series-card__row series-card__row--${neighbour.direction} m3-state-layer`}
 						href={neighbour.ref.url ?? getPostUrlBySlug(neighbour.ref.slug)}
-						aria-label={`${i18n(directionLabel[neighbour.direction])}: ${neighbour.ref.title}, ${partLabel(neighbour.index)}`}
+						aria-label={`${neighbour.ref.title} ${partLabel(neighbour.index)} — ${i18n(directionLabel[neighbour.direction])}`}
 					>
 						{neighbour.direction === "prev" && (
 							<Icon
