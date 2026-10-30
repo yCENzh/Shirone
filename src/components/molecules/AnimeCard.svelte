@@ -76,7 +76,6 @@ const metaLine = $derived(
 			href={anime.link}
 			target="_blank"
 			rel="noopener noreferrer"
-			aria-label={anime.title}
 		>
 			{@render coverContent()}
 		</a>

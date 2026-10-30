@@ -104,7 +104,9 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 function tileLabel(i: number) {
-	return `${i18n(I18nKey.openImage)} ${i + 1}`;
+	const label = `${i18n(I18nKey.openImage)} ${i + 1}`;
+	const alt = images[i]?.alt;
+	return alt ? `${label}: ${alt}` : label;
 }
 
 function thumbnailSrc(image: MomentImage) {
