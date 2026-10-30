@@ -44,6 +44,15 @@ const monthTitle = $derived(
 	),
 );
 
+const dateLabelFormatter = $derived(
+	new Intl.DateTimeFormat(locale, { dateStyle: "full" }),
+);
+
+function formatDateLabel(key: string): string {
+	const [dateYear, dateMonth, day] = key.split("-").map(Number);
+	return dateLabelFormatter.format(new Date(dateYear, dateMonth - 1, day, 12));
+}
+
 // 周名：2021-01-03 是周日，由此锚定一周 7 天（Intl weekday short）
 const weekStartOffset = $derived(startOfWeek === "mon" ? 1 : 0);
 const weekdays = $derived(
@@ -194,7 +203,7 @@ function toggleDay(cell: DayCell) {
 						class={`m3-calendar__day${cell.posts.length > 0 ? " m3-calendar__day--has-posts" : ""}${isTodayCell(cell) ? " m3-calendar__day--today" : ""}${cell.key === selectedDate ? " m3-calendar__day--selected" : ""}`}
 						disabled={cell.posts.length === 0}
 						aria-current={isTodayCell(cell) ? "date" : undefined}
-						aria-label={`${cell.key}${cell.posts.length > 0 ? `，${cell.posts.length} 篇文章` : ""}`}
+						aria-label={`${cell.day}, ${formatDateLabel(cell.key)}${cell.posts.length > 0 ? `，${cell.posts.length} 篇文章` : ""}`}
 						onclick={() => toggleDay(cell)}
 					>
 						{cell.day}
