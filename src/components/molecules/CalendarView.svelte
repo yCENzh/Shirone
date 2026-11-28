@@ -6,7 +6,8 @@
  * 动效：切月网格 reveal 淡入、文章列表 collapse 展开（motion.ts
  * 原语，reduced-motion 自动瞬切）。
  * 数据：传入 `dataUrl` 时水合后拉取一次全站共享的日历 JSON；拉取完成前
- * （以及禁用脚本时）网格照常显示，只是没有有文日标记，切月退化为逐月。
+ * （以及禁用脚本时）网格照常显示，没有有文日标记，切月按钮禁用；
+ * 拉取失败时切月退化为逐月。
  */
 import IconButton from "@components/atoms/action/IconButton.svelte";
 import I18nKey from "@i18n/i18nKey";
@@ -174,9 +175,19 @@ const nextMonthKey = $derived.by(() => {
 	}
 	return null;
 });
+// 数据还没到：此时不知道哪些月份有文章，切月按钮先禁用——否则会出现
+// 「数据到达前能点、点了是逐月，到达后又变成跳月或禁用」的前后不一致。
+// 请求失败（error）不算等待中：退化为逐月切换，日历仍然可用。
+const dataPending = $derived(
+	Boolean(dataUrl) && (dataState === "idle" || dataState === "loading"),
+);
 // 边界禁用：有文月存在且相邻方向没有更多有文月
-const canPrev = $derived(activeMonths.length === 0 || prevMonthKey !== null);
-const canNext = $derived(activeMonths.length === 0 || nextMonthKey !== null);
+const canPrev = $derived(
+	!dataPending && (activeMonths.length === 0 || prevMonthKey !== null),
+);
+const canNext = $derived(
+	!dataPending && (activeMonths.length === 0 || nextMonthKey !== null),
+);
 
 function shiftMonth(delta: number) {
 	if (activeMonths.length > 0) {

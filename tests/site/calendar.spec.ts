@@ -105,6 +105,35 @@ test.describe("sidebar calendar widget", () => {
 		expect(dataRequests).toHaveLength(1);
 	});
 
+	test("disables month navigation until the post data has arrived", async ({
+		page,
+	}) => {
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route("**/widget-data/calendar.json", async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto("/");
+		await calendar(page).scrollIntoViewIfNeeded();
+		await expect(
+			calendar(page).locator('.m3-calendar[data-calendar-state="loading"]'),
+		).toBeVisible();
+		const nextBtn = calendar(page).locator('[aria-label="Next month"]');
+		await expect(prevBtn(page)).toBeDisabled();
+		await expect(nextBtn).toBeDisabled();
+
+		release();
+		await expect(
+			calendar(page).locator('.m3-calendar[data-calendar-state="ready"]'),
+		).toBeVisible();
+		// 示例数据：当前月之后没有有文月，之前有
+		await expect(prevBtn(page)).toBeEnabled();
+		await expect(nextBtn).toBeDisabled();
+	});
+
 	test("keeps the month grid usable when the data file cannot be loaded", async ({
 		page,
 	}) => {
