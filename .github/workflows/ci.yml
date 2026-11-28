@@ -191,6 +191,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Optimised images are stored under the name of a hash of the source
+      # image and the transform, so an entry is either right or unused. Only
+      # this directory is cached: the content-layer store beside it is not,
+      # because a stale store outlives the entries it describes.
+      # After the install step, so pnpm never sees the directory.
+      - name: Restore optimised images
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules/.astro/assets
+          key: ${{ runner.os }}-astro-assets-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**/*.png', 'src/**/*.jpg', 'src/**/*.jpeg', 'src/**/*.webp', 'src/**/*.avif', 'src/**/*.gif', 'public/**/*.png', 'public/**/*.jpg', 'public/**/*.jpeg', 'public/**/*.webp') }}
+          restore-keys: |
+            ${{ runner.os }}-astro-assets-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Build production site
         run: pnpm build
 

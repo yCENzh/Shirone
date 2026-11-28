@@ -126,6 +126,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      # 图片优化结果：按「源图内容 + 变换参数」的哈希命名，条目要么正确、要么用不到，
+      # 跨 commit 复用是安全的；示例站冷构建里这一步约 50 秒，命中后不到 1 秒。
+      # 只缓存 assets 这一个子目录，同级的内容层存储仍然不缓存（理由见上）。
+      # 放在安装依赖之后，避免 pnpm 处理 node_modules 时碰到它。
+      # 另带上一次成功取到的 Meting 歌单文字：接口不通时字体子集用它兜底。
+      # key 含代码与内容两个 commit：任一变化才会存一份新的；依赖升级后从空缓存开始，
+      # 所以被替换掉的旧图不会一直留在缓存里。
+      - name: Restore optimised images
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            node_modules/.astro/assets
+            src/assets/fonts/.subset/meting-text.cache
+          key: ${{ runner.os }}-shirone-astro-assets-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}-${{ steps.content.outputs.sha }}
+          restore-keys: |
+            ${{ runner.os }}-shirone-astro-assets-${{ hashFiles('pnpm-lock.yaml') }}-
+
       # 独立成步，而不是依赖 `pnpm build` 内部再跑一次：
       # 内容问题（含 config/*.yaml 的类型校验）与构建问题因此在日志里天然分开，
       # 且 fonts:subset 需要内容与配置都已就位。
