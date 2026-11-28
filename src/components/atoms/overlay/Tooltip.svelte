@@ -39,7 +39,10 @@ let {
 let open = $state(false);
 let wrapEl = $state<HTMLSpanElement | null>(null);
 let tipEl = $state<HTMLSpanElement | null>(null);
-const tipId = `m3e-tooltip-${Math.random().toString(36).slice(2, 9)}`;
+// `$props.id()` is stable between the server render and hydration, and between
+// builds; a random suffix was neither.
+const uid = $props.id();
+const tipId = `m3e-tooltip-${uid}`;
 
 let tipX = $state(0);
 let tipY = $state(0);

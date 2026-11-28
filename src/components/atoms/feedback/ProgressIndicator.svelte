@@ -132,7 +132,8 @@ const wavyLinearWaveSpeed = $derived(
 	waveSpeed > 0 ? waveSpeed : wavyLinearWaveLength,
 );
 // 实例级唯一 clipId，供 determinate wavy linear 模式裁切可视区域
-const clipId = `pi-wavy-clip-${Math.random().toString(36).slice(2, 9)}`;
+const uid = $props.id();
+const clipId = `pi-wavy-clip-${uid}`;
 
 // 全宽路径 = 容器宽 + 左右各 2 个波长余量（官方 widthWithExtraPhase）
 const wavyLinearPathW = $derived(resolvedWidth + wavyLinearWaveLength * 2);
