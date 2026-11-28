@@ -74,6 +74,14 @@ Shirone 遵循 **「内容先行、布局稳定、平滑渐显、按需水合、
   任一条件不满足即不发起请求。抓取失败只会告警并退化为仅使用本地文本，不会中断构建。
   完全不需要该行为时（例如只用本地曲目），把它设为 `false` 即可换回零网络构建。
 - **零额外负担落地**：第三方 widget（如评论、播放器）必须通过动态加载或条件构建插件接入。
+- **首屏脚本只带当前站点用得到的部分**：
+  - 界面文案：生产构建只打包 `siteConfig.lang` 对应的那一份词典（`src/integration/vite/active-locale.ts`
+    在构建时替换 `src/i18n/active-locale.ts`）；`astro dev` 与非 Vite 环境仍可使用全部 10 份。
+    新增语言的步骤见 `src/i18n/AGENTS.md`。
+  - 配色引擎（`src/utils/mc-utils.ts`，约 88 KB）：不进首屏。站点默认配色由服务端写进 HTML；
+    访客自选的配色算好后存入 `localStorage` 的 `mc-scheme-cache`，下次由 `<head>` 里的内联脚本直接恢复；
+    引擎只在第一次需要计算、或打开显示设置面板时才下载。会进首屏的模块只能从
+    `src/utils/mc-types.ts` 取名称与类型，不得静态导入 `mc-utils.ts`。
 
 ---
 

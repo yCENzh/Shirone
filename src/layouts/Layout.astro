@@ -4,8 +4,14 @@ import Snackbar from "@components/atoms/overlay/Snackbar.svelte";
 import ConfigCarrier from "@components/system/ConfigCarrier.astro";
 import UmamiRuntime from "@components/system/UmamiRuntime.astro";
 import { resolveAsset } from "@utils/asset-utils";
+import { createDefaultSchemeStyle } from "@utils/default-scheme-style";
 import { getShellStylesheetHref } from "@utils/shell-stylesheets";
-import { createDefaultSchemeStyle } from "@utils/theme-utils";
+import {
+	SCHEME_CACHE_KEY,
+	SCHEME_CACHE_VERSION,
+	SPEC_KEY,
+	STYLE_KEY,
+} from "@utils/theme-utils";
 import { pathsEqual, toAbsoluteUrl, url } from "@utils/url-utils";
 import {
 	expressiveCodeConfig,
@@ -82,6 +88,16 @@ const resolvedOgImage = await resolveAsset(candidateOgImage);
 const absoluteOgImage = toAbsoluteUrl(resolvedOgImage, canonicalUrl);
 
 const configHue = siteConfig.themeColor.hue;
+// For the inline script below, which restores a visitor's own color scheme
+// before first paint (the keys and the cache shape live in theme-utils).
+const schemeRestore = {
+	cacheKey: SCHEME_CACHE_KEY,
+	version: SCHEME_CACHE_VERSION,
+	styleKey: STYLE_KEY,
+	specKey: SPEC_KEY,
+	defaultStyle: siteConfig.themeColor.style,
+	defaultSpec: siteConfig.themeColor.spec,
+};
 const lightTheme =
 	expressiveCodeConfig.lightTheme ?? expressiveCodeConfig.theme;
 const darkTheme = expressiveCodeConfig.darkTheme ?? expressiveCodeConfig.theme;
@@ -165,7 +181,7 @@ const defaultSchemeStyle = createDefaultSchemeStyle();
 			/>
 		))}
 
-		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, configHue, lightTheme, darkTheme, defaultWallpaperMode, defaultTexturePreset, defaultTextureOpacity, textureEnabled}}>
+		<script is:inline define:vars={{DEFAULT_THEME, LIGHT_MODE, DARK_MODE, AUTO_MODE, BANNER_HEIGHT_EXTEND, configHue, lightTheme, darkTheme, defaultWallpaperMode, defaultTexturePreset, defaultTextureOpacity, textureEnabled, schemeRestore}}>
 			const theme = localStorage.getItem('theme') || DEFAULT_THEME;
 			let isDark = false;
 			switch (theme) {
@@ -188,6 +204,26 @@ const defaultSchemeStyle = createDefaultSchemeStyle();
 			document.documentElement.setAttribute('data-theme', isDark ? darkTheme : lightTheme);
 			const hue = localStorage.getItem('hue') || configHue;
 			document.documentElement.style.setProperty('--hue', hue);
+			// A visitor who picked their own colors gets them from the cache that
+			// theme-utils keeps, so the first paint is already right and the color
+			// engine is not downloaded. A miss leaves the site default in place and
+			// theme-utils resolves the scheme after load.
+			try {
+				const schemeCache = JSON.parse(localStorage.getItem(schemeRestore.cacheKey) || 'null');
+				const schemeKey = [
+					parseInt(hue, 10),
+					localStorage.getItem(schemeRestore.styleKey) || schemeRestore.defaultStyle,
+					localStorage.getItem(schemeRestore.specKey) || schemeRestore.defaultSpec,
+				].join('|');
+				const schemeVars = schemeCache && schemeCache.v === schemeRestore.version && schemeCache.key === schemeKey
+					? schemeCache[isDark ? 'dark' : 'light']
+					: null;
+				if (schemeVars) {
+					for (const name in schemeVars) {
+						document.documentElement.style.setProperty(name, schemeVars[name]);
+					}
+				}
+			} catch {}
 			if (localStorage.getItem('mc-motion') === 'reduced') {
 				document.documentElement.classList.add('motion-reduced');
 			}

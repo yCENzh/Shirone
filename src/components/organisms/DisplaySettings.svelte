@@ -19,8 +19,7 @@ import {
 	MC_STYLES,
 	type McSpec,
 	type McStyle,
-	resolveScheme,
-} from "@utils/mc-utils";
+} from "@utils/mc-types";
 import {
 	getDefaultHue,
 	getDefaultTextureOpacity,
@@ -36,7 +35,13 @@ import {
 	setTexturePreset,
 	setWallpaperMode,
 } from "@utils/setting-utils";
-import { getSpec, getStyle, setSpec, setStyle } from "@utils/theme-utils";
+import {
+	getSpec,
+	getStyle,
+	loadSchemeEngine,
+	setSpec,
+	setStyle,
+} from "@utils/theme-utils";
 import { onMount } from "svelte";
 import {
 	getDefaultSpec,
@@ -66,6 +71,16 @@ let dark = $state(
 let motionReduced = $state(false);
 // 九宫格色卡在面板首次打开前不计算（9 次配色解算只在用户真正查看时发生）
 let panelOpened = $state(false);
+// 配色引擎（约 80 KB）不进首屏：面板首次打开时才加载，到达前色卡留空
+let schemeEngine = $state<Awaited<ReturnType<typeof loadSchemeEngine>> | null>(
+	null,
+);
+$effect(() => {
+	if (!panelOpened || schemeEngine) return;
+	void loadSchemeEngine().then((engine) => {
+		schemeEngine = engine;
+	});
+});
 
 // 文章列表布局（list/grid）：初始值取访客偏好，变化时存储 + FLIP 重排
 const defaultLayoutMode = defaultMode();
@@ -235,7 +250,8 @@ function styleKey(s: McStyle): I18nKey {
 
 /** 某个风格在当前色相/明暗/规范下的 primary/secondary/tertiary */
 function styleColors(s: McStyle, h: number, d: boolean, sp: McSpec) {
-	const scheme = resolveScheme(h, d, s, sp);
+	if (!schemeEngine) return null;
+	const scheme = schemeEngine.resolveScheme(h, d, s, sp);
 	return {
 		primary: scheme.primary ?? "#888",
 		secondary: scheme.secondary ?? "#888",
@@ -245,7 +261,8 @@ function styleColors(s: McStyle, h: number, d: boolean, sp: McSpec) {
 
 /** 当前主色（标题右侧预览圆点） */
 const currentColor = $derived(
-	panelOpened ? styleColors(style, hue, dark, spec).primary : "transparent",
+	(panelOpened ? styleColors(style, hue, dark, spec)?.primary : null) ??
+		"transparent",
 );
 
 /** 9 个风格的色卡预览（3×3 网格） */

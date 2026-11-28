@@ -4,15 +4,21 @@ import {
 	type McScheme,
 	type McSpec,
 	type McStyle,
-	resolveScheme,
-} from "@utils/mc-utils";
+} from "@utils/mc-types";
 import { getDefaultSpec, getDefaultStyle, siteConfig } from "@/config";
 
-const STYLE_KEY = "mc-style";
-const SPEC_KEY = "mc-spec";
+export const STYLE_KEY = "mc-style";
+export const SPEC_KEY = "mc-spec";
+/**
+ * Where the last computed non-default scheme is kept (see `SchemeCache`).
+ * The inline script in `Layout.astro` reads the same key before first paint.
+ */
+export const SCHEME_CACHE_KEY = "mc-scheme-cache";
+/** Bump when a change makes stored schemes wrong, e.g. an engine upgrade. */
+export const SCHEME_CACHE_VERSION = 1;
 
 /** CSS custom-property names emitted for each M3/M3E role. */
-const ROLE_TO_CSS: Record<string, string> = {
+export const ROLE_TO_CSS: Record<string, string> = {
 	primary: "--mc-primary",
 	onPrimary: "--mc-on-primary",
 	primaryContainer: "--mc-primary-container",
@@ -94,42 +100,97 @@ export function setSpec(spec: McSpec): void {
 	applyCurrentScheme();
 }
 
-/**
- * The layout asks for this on every page while the inputs are site-wide
- * constants, so the two scheme resolutions run once per build.
- */
-let defaultSchemeStyleCache: { key: string; css: string } | null = null;
+/** The engine module, loaded on first use: see `loadSchemeEngine`. */
+type SchemeEngine = typeof import("@utils/mc-utils");
+
+let schemeEngine: SchemeEngine | null = null;
+let schemeEngineLoading: Promise<SchemeEngine> | null = null;
 
 /**
- * Serialize the site-default light and dark schemes as static CSS so the first
- * paint already carries them and visitors on the defaults never run the engine.
+ * Load the color engine (`mc-utils`, which wraps
+ * `@material/material-color-utilities`).
+ *
+ * The site-default scheme is static CSS and a visitor's own scheme is restored
+ * from `SCHEME_CACHE_KEY`, so most page loads never need the engine. Importing
+ * it statically put about 80 KB into every first load; it is now fetched when
+ * a visitor opens the display settings or picks a scheme that is not stored.
  */
-export function createDefaultSchemeStyle(): string {
-	const { hue, style, spec } = siteConfig.themeColor;
-	const cacheKey = `${hue}|${style}|${spec}`;
-	if (defaultSchemeStyleCache?.key === cacheKey) {
-		return defaultSchemeStyleCache.css;
+export function loadSchemeEngine(): Promise<SchemeEngine> {
+	schemeEngineLoading ??= import("@utils/mc-utils").then((engine) => {
+		schemeEngine = engine;
+		return engine;
+	});
+	return schemeEngineLoading;
+}
+
+/** CSS custom properties of one resolved scheme, e.g. `--mc-primary`. */
+type SchemeVars = Record<string, string>;
+
+/**
+ * The visitor's last non-default scheme, as stored in `localStorage`.
+ *
+ * `key` is `hue|style|spec`. The two modes are filled in as each is first
+ * shown, because resolving a scheme costs a few milliseconds and the hue
+ * slider applies one on every step.
+ */
+interface SchemeCache {
+	v: number;
+	key: string;
+	light?: SchemeVars;
+	dark?: SchemeVars;
+}
+
+function readSchemeCache(key: string): SchemeCache {
+	try {
+		const stored = JSON.parse(
+			localStorage.getItem(SCHEME_CACHE_KEY) ?? "null",
+		) as SchemeCache | null;
+		if (stored?.v === SCHEME_CACHE_VERSION && stored.key === key) return stored;
+	} catch {
+		// Unreadable storage or a malformed entry: treat as empty.
 	}
-	const block = (isDark: boolean) => {
-		const scheme = resolveScheme(hue, isDark, style as McStyle, spec as McSpec);
-		return Object.entries(ROLE_TO_CSS)
-			.filter(([role]) => scheme[role])
-			.map(([role, cssVar]) => `${cssVar}:${scheme[role]}`)
-			.join(";");
-	};
-	const css = `:root{${block(false)}}:root.dark{${block(true)}}`;
-	defaultSchemeStyleCache = { key: cacheKey, css };
-	return css;
+	return { v: SCHEME_CACHE_VERSION, key };
+}
+
+function writeSchemeCache(cache: SchemeCache): void {
+	try {
+		localStorage.setItem(SCHEME_CACHE_KEY, JSON.stringify(cache));
+	} catch {
+		// Storage full or blocked: the scheme is recomputed on the next load.
+	}
+}
+
+function toSchemeVars(scheme: McScheme): SchemeVars {
+	const vars: SchemeVars = {};
+	for (const [role, cssVar] of Object.entries(ROLE_TO_CSS)) {
+		const value = scheme[role];
+		if (value) vars[cssVar] = value;
+	}
+	return vars;
+}
+
+/** Write a scheme onto `:root`; an empty one clears every override. */
+function writeSchemeVars(root: HTMLElement, vars: SchemeVars): void {
+	for (const cssVar of Object.values(ROLE_TO_CSS)) {
+		const value = vars[cssVar];
+		if (value) root.style.setProperty(cssVar, value);
+		else root.style.removeProperty(cssVar);
+	}
 }
 
 let appliedSchemeKey = "";
 
 /**
- * Recompute and apply the dynamic M3/M3E scheme for the current hue, style,
- * spec and light/dark mode, writing concrete hex values onto CSS custom
- * properties on `:root`. The site-default scheme is shipped as static CSS by
- * `createDefaultSchemeStyle()`, so for it the inline overrides are cleared
- * instead; unchanged inputs are skipped to avoid redundant style recalcs.
+ * Apply the dynamic M3/M3E scheme for the current hue, style, spec and
+ * light/dark mode, writing concrete hex values onto CSS custom properties on
+ * `:root`. Unchanged inputs are skipped to avoid redundant style recalcs.
+ *
+ * - The site-default scheme is shipped as static CSS (see
+ *   `default-scheme-style.ts`), so for it the inline overrides are cleared.
+ * - A scheme already in the cache is applied from there.
+ * - Anything else needs the engine. Once it is loaded this is synchronous;
+ *   the first time, the scheme is applied when the engine arrives, unless the
+ *   inputs have changed again by then.
  */
 export function applyCurrentScheme(): void {
 	const root = document.querySelector(":root") as HTMLElement | null;
@@ -150,16 +211,25 @@ export function applyCurrentScheme(): void {
 		hue === siteConfig.themeColor.hue &&
 		style === getDefaultStyle() &&
 		spec === getDefaultSpec();
-	const scheme: McScheme = isDefault
-		? {}
-		: resolveScheme(hue, isDark, style, spec);
-
-	for (const [role, cssVar] of Object.entries(ROLE_TO_CSS)) {
-		const value = scheme[role];
-		if (value) {
-			root.style.setProperty(cssVar, value);
-		} else {
-			root.style.removeProperty(cssVar);
-		}
+	if (isDefault) {
+		writeSchemeVars(root, {});
+		return;
 	}
+
+	const mode = isDark ? "dark" : "light";
+	const cache = readSchemeCache(`${hue}|${style}|${spec}`);
+	const cached = cache[mode];
+	if (cached) {
+		writeSchemeVars(root, cached);
+		return;
+	}
+
+	const resolveAndApply = (engine: SchemeEngine) => {
+		const vars = toSchemeVars(engine.resolveScheme(hue, isDark, style, spec));
+		writeSchemeCache({ ...cache, [mode]: vars });
+		// The inputs may have moved on while the engine was loading.
+		if (appliedSchemeKey === key) writeSchemeVars(root, vars);
+	};
+	if (schemeEngine) resolveAndApply(schemeEngine);
+	else void loadSchemeEngine().then(resolveAndApply);
 }

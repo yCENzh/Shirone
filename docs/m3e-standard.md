@@ -309,7 +309,9 @@ variables.styl  --mc-* → 语义令牌（--primary、--surface-container-low…
 | 文件 | 职责 |
 |---|---|
 | `src/utils/mc-utils.ts` | HCT 引擎：9 风格 × 2 规范 × 56 角色 → hex |
-| `src/utils/theme-utils.ts` | 角色 → `--mc-*` 映射、localStorage（`mc-style`/`mc-spec`）、`applyCurrentScheme` |
+| `src/utils/theme-utils.ts` | 角色 → `--mc-*` 映射、localStorage（`mc-style`/`mc-spec`/`mc-scheme-cache`）、`applyCurrentScheme`、`loadSchemeEngine` |
+| `src/utils/mc-types.ts` | 风格/规范的名称与类型（不含引擎，客户端代码从这里取，避免把引擎带进首屏） |
+| `src/utils/default-scheme-style.ts` | 站点默认配色的静态 CSS（仅服务端，静态导入引擎） |
 | `src/utils/setting-utils.ts` | 色相 / 明暗 / Expressive Code 主题联动 |
 | `src/utils/snackbar.ts` | Snackbar 事件总线 |
 | `src/utils/menu-bus.ts` | 菜单互斥事件总线（Menu/FABMenu 单开联动，`exclusive` 参数） |

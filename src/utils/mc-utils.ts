@@ -25,24 +25,15 @@ import {
 	SchemeTonalSpot,
 	SchemeVibrant,
 } from "@material/material-color-utilities";
+import {
+	MC_SPECS,
+	MC_STYLES,
+	type McScheme,
+	type McSpec,
+	type McStyle,
+} from "./mc-types.ts";
 
-/** Palette style — mirrors `com.materialkolor.PaletteStyle`. */
-export const MC_STYLES = [
-	"tonalSpot",
-	"vibrant",
-	"content",
-	"expressive",
-	"rainbow",
-	"fruitSalad",
-	"monochrome",
-	"neutral",
-	"fidelity",
-] as const;
-export type McStyle = (typeof MC_STYLES)[number];
-
-/** Design spec version — mirrors `ColorSpec.SpecVersion`. */
-export const MC_SPECS = ["2021", "2025"] as const;
-export type McSpec = (typeof MC_SPECS)[number];
+export { MC_SPECS, MC_STYLES, type McScheme, type McSpec, type McStyle };
 
 /** Hue used by the dynamic engine's seed (mid-tone, medium chroma). */
 const SEED_CHROMA = 60;
@@ -200,8 +191,6 @@ function argbToHex(argb: number): string {
 		.map((shift) => ((argb >> shift) & 0xff).toString(16).padStart(2, "0"))
 		.join("")}`;
 }
-
-export type McScheme = Record<string, string | null>;
 
 /**
  * Resolve every M3/M3E color role to hex for a given seed hue, style, spec and
