@@ -1,4 +1,4 @@
-<script lang="ts">
+<script lang="ts" module>
 import { localIconCollections } from "virtual:shirone-icons";
 import OfflineIcon from "@shirone/iconify-offline";
 import { addCollection } from "@shirone/iconify-offline-functions";
@@ -13,6 +13,9 @@ import type { IconProps } from "./Icon.svelte";
  */
 const warnedNames = new Set<string>();
 
+// Registered once per module evaluation, not once per rendered icon: each
+// `addCollection` call validates and re-parses the whole set, and a page
+// renders this component about ninety times.
 for (const collection of localIconCollections) addCollection(collection);
 
 // Runs during component setup rather than in an `$effect`, so a copied-in
@@ -27,7 +30,9 @@ function warnAboutLegacyName(raw: unknown): void {
 		`[shirones] <Icon name="${raw}"> is the removed astro-icon API; rename it to icon="${raw}" or the icon renders as an empty node.`,
 	);
 }
+</script>
 
+<script lang="ts">
 // Typed from this package's own `IconProps` rather than inferred from
 // `OfflineIcon`: see the note in `Icon.svelte.d.ts`.
 let { icon, name, ...props }: IconProps & Record<string, unknown> = $props();

@@ -95,11 +95,21 @@ export function setSpec(spec: McSpec): void {
 }
 
 /**
+ * The layout asks for this on every page while the inputs are site-wide
+ * constants, so the two scheme resolutions run once per build.
+ */
+let defaultSchemeStyleCache: { key: string; css: string } | null = null;
+
+/**
  * Serialize the site-default light and dark schemes as static CSS so the first
  * paint already carries them and visitors on the defaults never run the engine.
  */
 export function createDefaultSchemeStyle(): string {
 	const { hue, style, spec } = siteConfig.themeColor;
+	const cacheKey = `${hue}|${style}|${spec}`;
+	if (defaultSchemeStyleCache?.key === cacheKey) {
+		return defaultSchemeStyleCache.css;
+	}
 	const block = (isDark: boolean) => {
 		const scheme = resolveScheme(hue, isDark, style as McStyle, spec as McSpec);
 		return Object.entries(ROLE_TO_CSS)
@@ -107,7 +117,9 @@ export function createDefaultSchemeStyle(): string {
 			.map(([role, cssVar]) => `${cssVar}:${scheme[role]}`)
 			.join(";");
 	};
-	return `:root{${block(false)}}:root.dark{${block(true)}}`;
+	const css = `:root{${block(false)}}:root.dark{${block(true)}}`;
+	defaultSchemeStyleCache = { key: cacheKey, css };
+	return css;
 }
 
 let appliedSchemeKey = "";

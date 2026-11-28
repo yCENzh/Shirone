@@ -27,13 +27,20 @@ function assertValidDate(date: Date, label: string): void {
 	}
 }
 
+/** Constructing an `Intl.DateTimeFormat` per call is the slow part. */
+const timeZoneValidity = new Map<string, boolean>();
+
 export function isValidTimeZone(timeZone: string): boolean {
+	const known = timeZoneValidity.get(timeZone);
+	if (known !== undefined) return known;
+	let valid = true;
 	try {
 		new Intl.DateTimeFormat("en-CA", { timeZone }).format();
-		return true;
 	} catch {
-		return false;
+		valid = false;
 	}
+	timeZoneValidity.set(timeZone, valid);
+	return valid;
 }
 
 function getDateParts(date: Date, timeZone: string): DateParts {
