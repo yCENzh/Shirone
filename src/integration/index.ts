@@ -46,6 +46,7 @@ import {
 	reportPeerViolations,
 	verifyPeerRequirements,
 } from "./verify-peers.ts";
+import { shironesActiveLocale } from "./vite/active-locale.ts";
 import { shironesFallbackResolver } from "./vite/fallback-resolver.ts";
 import { shironesIconRegeneration } from "./vite/icon/regeneration.ts";
 import { shironesOverlay } from "./vite/overlay.ts";
@@ -278,6 +279,7 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 				const siteConfig = siteModule.siteConfig as {
 					site?: string;
 					base?: string;
+					lang?: string;
 				};
 
 				const sidebarModule = await loadConfigModule(
@@ -439,6 +441,7 @@ export function shirones(options: ShironesOptions = {}): AstroIntegration {
 										}),
 									]),
 							shironesFallbackResolver(paths),
+							shironesActiveLocale(paths, siteConfig?.lang),
 							shironesIconRegeneration(paths, logger, [
 								...Object.values(options.components ?? {}).map((target) =>
 									resolve(paths.projectRoot, target),
