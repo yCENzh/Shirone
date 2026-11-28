@@ -5,11 +5,13 @@
  * 按站点 locale 生成，文章计数短语在组件内取 i18n（与侧栏同一来源）。
  * 动效：切月网格 reveal 淡入、文章列表 collapse 展开（motion.ts
  * 原语，reduced-motion 自动瞬切）。
+ * 数据：传入 `dataUrl` 时水合后拉取一次全站共享的日历 JSON；拉取完成前
+ * （以及禁用脚本时）网格照常显示，只是没有有文日标记，切月退化为逐月。
  */
 import IconButton from "@components/atoms/action/IconButton.svelte";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import type { CalendarPost } from "@utils/calendar-data";
+import type { CalendarData, CalendarPost } from "@utils/calendar-data";
 import { createGregorianDateFormatter } from "@utils/locale-utils";
 import { collapse, reveal } from "@utils/motion";
 
@@ -17,10 +19,12 @@ interface Props {
 	/** BCP47 locale（由 siteConfig.lang 换算，Intl 用） */
 	locale: string;
 	startOfWeek: "mon" | "sun";
-	/** dateKey（YYYY-MM-DD）→ 当日文章 */
-	postsByDate: Record<string, CalendarPost[]>;
+	/** 日历数据 JSON 的地址；提供时在水合后拉取并替换下面两项 */
+	dataUrl?: string;
+	/** dateKey（YYYY-MM-DD）→ 当日文章（未提供 dataUrl 时的直传数据） */
+	postsByDate?: Record<string, CalendarPost[]>;
 	/** 有文章月份列表（升序 YYYY-MM），跳月导航用 */
-	activeMonths: string[];
+	activeMonths?: string[];
 	backTodayLabel: string;
 	prevMonthLabel: string;
 	nextMonthLabel: string;
@@ -29,12 +33,46 @@ interface Props {
 let {
 	locale,
 	startOfWeek = "mon",
-	postsByDate,
-	activeMonths = [],
+	dataUrl,
+	postsByDate: initialPostsByDate = {},
+	activeMonths: initialActiveMonths = [],
 	backTodayLabel,
 	prevMonthLabel,
 	nextMonthLabel,
 }: Props = $props();
+
+let loaded = $state<CalendarData | null>(null);
+const postsByDate = $derived(loaded?.postsByDate ?? initialPostsByDate);
+const activeMonths = $derived(loaded?.activeMonths ?? initialActiveMonths);
+/** "ready" 表示有文日标记与跳月导航已是最终数据（测试与样式可据此等待） */
+let dataState = $state<"idle" | "loading" | "ready" | "error">("idle");
+
+// 只在浏览器执行（$effect 不参与 SSR）。`no-cache` 让浏览器每次带条件请求
+// 重新验证：文件名不带内容哈希（带了就得把哈希写进每个页面，等于又把
+// 全站数据的变化扩散到所有页面），所以不能依赖长缓存。
+$effect(() => {
+	if (!dataUrl) {
+		dataState = "ready";
+		return;
+	}
+	const controller = new AbortController();
+	dataState = "loading";
+	fetch(dataUrl, { cache: "no-cache", signal: controller.signal })
+		.then((response) => {
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			return response.json() as Promise<CalendarData>;
+		})
+		.then((data) => {
+			loaded = data;
+			dataState = "ready";
+		})
+		.catch((error: unknown) => {
+			if (controller.signal.aborted) return;
+			dataState = "error";
+			console.warn("[calendar] failed to load post data:", error);
+		});
+	return () => controller.abort();
+});
 
 const today = new Date();
 let year = $state(today.getFullYear());
@@ -168,7 +206,7 @@ function toggleDay(cell: DayCell) {
 }
 </script>
 
-<div class="m3-calendar">
+<div class="m3-calendar" data-calendar-state={dataState}>
 	<header class="m3-calendar__bar">
 		<IconButton
 			variant="standard"

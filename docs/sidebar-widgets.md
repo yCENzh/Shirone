@@ -88,8 +88,13 @@ interface SidebarWidgetBase {
 
 ## 7. Calendar — 月度文章历
 
-- **数据源**：`src/utils/calendar-data.ts`（文章日期聚合）；
-- **渲染**：`CalendarView.svelte`（`client:visible` 水合岛）；
+- **数据源**：`src/utils/calendar-data.ts`（文章日期聚合）。全站只输出一份
+  `/widget-data/calendar.json`（端点 `src/pages/widget-data/[name].json.ts`），
+  页面 HTML 里不带文章列表；日历 widget 关闭时不输出该文件；
+- **渲染**：`CalendarView.svelte`（`client:visible` 水合岛）。SSR 直出当月网格，
+  水合后拉取一次数据文件，再补上有文日标记与跳月导航；拉取失败或禁用脚本时
+  网格照常可用（逐月切换，无标记）。根节点 `data-calendar-state`
+  （`loading` / `ready` / `error`）标出数据状态；
 - **页面范围**：全页面通用。
 
 ---

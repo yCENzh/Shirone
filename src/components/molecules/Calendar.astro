@@ -1,14 +1,16 @@
 ---
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { getCalendarData } from "@utils/calendar-data";
+import { CALENDAR_DATA_PATH } from "@utils/calendar-data";
+import { url } from "@utils/url-utils";
 import { siteConfig } from "@/config/siteConfig";
 import type { CalendarWidget } from "@/types/sidebarConfig";
 /**
  * 月度文章历侧栏 widget（数据驱动）。
- * wrapper 只负责取数 + i18n 外壳；交互视图在 CalendarView.svelte
- * （client:visible 惰性水合）。数据 SSR 直出——侧栏静态渲染在 Swup
- * 容器外，不从 API 端点拉取；日期口径与文章卡片一致（date-utils）。
+ * wrapper 只负责 i18n 外壳与数据地址；交互视图在 CalendarView.svelte
+ * （client:visible 惰性水合）。SSR 只直出当月网格骨架；文章数据是全站
+ * 共享的一份 `/widget-data/calendar.json`，水合后拉取一次——侧栏在 Swup
+ * 容器外常驻，整次会话只请求一次。日期口径与文章卡片一致（date-utils）。
  */
 import CalendarView from "./CalendarView.svelte";
 import WidgetLayout from "./WidgetLayout.astro";
@@ -27,7 +29,7 @@ const startOfWeek = Astro.props.widget?.startOfWeek ?? "mon";
 // siteConfig.lang 形如 zh_CN / en：替换为 BCP47 供 Intl 使用
 const locale = siteConfig.lang.replace("_", "-");
 
-const { postsByDate, activeMonths } = await getCalendarData();
+const dataUrl = url(CALENDAR_DATA_PATH);
 ---
 
 <WidgetLayout name={i18n(I18nKey.calendar)} id="calendar" class={className} style={style}>
@@ -35,8 +37,7 @@ const { postsByDate, activeMonths } = await getCalendarData();
 		client:visible
 		{locale}
 		{startOfWeek}
-		{postsByDate}
-		{activeMonths}
+		{dataUrl}
 		backTodayLabel={i18n(I18nKey.calendarBackToday)}
 		prevMonthLabel={i18n(I18nKey.calendarPrevMonth)}
 		nextMonthLabel={i18n(I18nKey.calendarNextMonth)}

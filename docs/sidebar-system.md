@@ -188,7 +188,7 @@ export const sidebarConfig: SidebarConfig = {
 | `series` | `Series` | `getSeriesCatalog` + `getSortedPostsList` | `WidgetLayout` | `collapseAfter?`（默认 5）；受 `seriesConfig.enable` 控制，无系列实体时不渲染 |
 | `announcement` | `Announcement` | `announcementConfig` | 无（Banner round） | — |
 | `stats` | `SiteStats` | `getSiteStats` | `WidgetLayout` | — |
-| `calendar` | `Calendar` | `getCalendarData` | `WidgetLayout` | `startOfWeek?`（默认 `"mon"`） |
+| `calendar` | `Calendar` | `/widget-data/calendar.json`（`getCalendarData`，水合后拉取） | `WidgetLayout` | `startOfWeek?`（默认 `"mon"`） |
 | `music` | `MusicSidebar`（organisms） | `musicConfig` | `WidgetLayout` | —（内容与初始状态来自全局配置） |
 | `toc` | `SidebarTOC` | 当前文章 headings | `WidgetLayout` | —（通常限定 `pages: ["post"]`） |
 

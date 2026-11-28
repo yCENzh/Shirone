@@ -76,7 +76,7 @@
 | `WidgetLayout` | 侧栏卡片容器（折叠标题 + 内容） |
 | `Announcement` | 公告侧栏 widget（Banner 原子 round 形态，无标题外壳；内容源 `announcementConfig`） |
 | `SiteStats` | 站点统计侧栏 widget（规格表行：MetaIcon 徽标 + 点线引导 + 表格数字；数据源 `utils/site-stats` 备忘化汇总） |
-| `Calendar` | 月度文章历侧栏 widget（SSR 直出日期聚合 + CalendarView 水合岛：单月视图、切月 reveal、点击有文日 collapse 展开当日文章） |
+| `Calendar` | 月度文章历侧栏 widget（SSR 直出当月网格，文章数据取自全站共享的 `/widget-data/calendar.json` + CalendarView 水合岛：单月视图、切月 reveal、点击有文日 collapse 展开当日文章） |
 | `SidebarTOC` | 文章目录侧栏 widget（WidgetLayout 外壳 + 内嵌 `<table-of-contents>` 自定义元素及 `TocList` 原子） |
 | `Series` | 系列列表侧栏 widget（WidgetLayout + 复用 `CategoryList` 的名称/数量形态，按最近更新排序，受 `seriesConfig.enable` 门控；新增页面标识 `"series"`） |
 | `SeriesCard` | 文章内系列块（系列名 + 第 N/共 M + 组内上一篇/下一篇，位置由 `seriesConfig.cardPosition` 决定）。分节语言与 `ArticleDiscovery` 一致：无容器背景/描边，lane 标题（图标 + 标题 + 横线 + 状态 pill），条目是整行状态层链接 |

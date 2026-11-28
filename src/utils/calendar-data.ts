@@ -1,12 +1,30 @@
 /**
  * 日历取数：聚合全部文章的发布日（dateKey → 当日文章）。
- * SSR 直出（侧栏静态渲染在 Swup 容器外，不走 API 端点）；
- * 模块级备忘化，多页面渲染共享一次汇总。
+ * 全站只输出一份 `/widget-data/calendar.json`，日历水合后按需拉取；
+ * 不再把全量文章列表序列化进每个页面（文章数 N 时每页多 O(N) 字节，
+ * 且任一篇改标题/日期都会让全部页面变化）。
+ * 模块级备忘化，端点渲染共享一次汇总。
  * 日期口径与文章卡片一致（formatDateToYYYYMMDD，UTC 字段直取）。
  */
+import { sidebarConfig } from "@/config/sidebarConfig";
 import { getSortedPosts } from "./content-utils";
 import { formatDateToYYYYMMDD } from "./date-utils";
 import { getPostUrl } from "./url-utils.ts";
+
+/** `src/pages/widget-data/[name].json.ts` 的 `name` 参数。 */
+export const CALENDAR_DATA_NAME = "calendar";
+/** 日历数据文件的站内路径（未带 base，交给 `url()` 处理）。 */
+export const CALENDAR_DATA_PATH: string = `/widget-data/${CALENDAR_DATA_NAME}.json`;
+
+/** 侧栏里是否有启用的日历 widget；关闭时不输出数据文件。 */
+export function isCalendarWidgetEnabled(): boolean {
+	return (
+		sidebarConfig.enable &&
+		sidebarConfig.components.some(
+			(widget) => widget.type === "calendar" && widget.enable,
+		)
+	);
+}
 
 export interface CalendarPost {
 	id: string;

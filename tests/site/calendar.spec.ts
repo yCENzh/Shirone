@@ -52,6 +52,10 @@ test.describe("sidebar calendar widget", () => {
 	async function openHome(page: import("@playwright/test").Page) {
 		await page.goto("/", { waitUntil: "networkidle" });
 		await calendar(page).scrollIntoViewIfNeeded();
+		// 文章数据在水合后拉取（/widget-data/calendar.json），等它就绪再断言
+		await expect(
+			calendar(page).locator('.m3-calendar[data-calendar-state="ready"]'),
+		).toBeVisible();
 		await page.waitForTimeout(800);
 	}
 
@@ -80,6 +84,47 @@ test.describe("sidebar calendar widget", () => {
 		}
 		throw new Error(`month ${target} not reached`);
 	}
+
+	test("loads post data from one shared file instead of the page HTML", async ({
+		page,
+	}) => {
+		const dataRequests: string[] = [];
+		page.on("request", (request) => {
+			if (request.url().includes("/widget-data/calendar.json")) {
+				dataRequests.push(request.url());
+			}
+		});
+		const response = await page.goto("/", { waitUntil: "networkidle" });
+		// 页面 HTML 不再携带全站文章列表（岛屿 props 里没有 postsByDate）
+		expect(await response?.text()).not.toContain("postsByDate");
+
+		await calendar(page).scrollIntoViewIfNeeded();
+		await expect(
+			calendar(page).locator('.m3-calendar[data-calendar-state="ready"]'),
+		).toBeVisible();
+		expect(dataRequests).toHaveLength(1);
+	});
+
+	test("keeps the month grid usable when the data file cannot be loaded", async ({
+		page,
+	}) => {
+		await page.route("**/widget-data/calendar.json", (route) => route.abort());
+		await page.goto("/", { waitUntil: "networkidle" });
+		await calendar(page).scrollIntoViewIfNeeded();
+		await expect(
+			calendar(page).locator('.m3-calendar[data-calendar-state="error"]'),
+		).toBeVisible();
+
+		// 没有数据：无有文日标记，切月退化为逐月，网格与回今天照常
+		await expect(
+			calendar(page).locator(".m3-calendar__day--has-posts"),
+		).toHaveCount(0);
+		const initial = (await title(page).textContent())?.trim();
+		await prevBtn(page).click();
+		await expect(title(page)).not.toHaveText(initial ?? "");
+		await title(page).click();
+		await expect(title(page)).toHaveText(initial ?? "");
+	});
 
 	test("renders month grid with today highlighted", async ({ page }) => {
 		await openHome(page);
