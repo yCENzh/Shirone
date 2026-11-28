@@ -262,6 +262,7 @@ pnpm.cmd fonts:check
 - **`local` 本地模式**：自动扫描 `src/data/music.ts` 中所有的曲目名与艺术家；
 - **`custom` 自定义列表**：扫描 `musicConfig.tracks` 中的所有曲目文字；
 - **`meting` / `mixed` 云端歌单与混合模式**：自动请求 Meting 远端歌单接口，将远端歌单中的所有歌曲标题、歌手与专辑文字一并纳入子集提取池中，**彻底杜绝远端歌单歌名缺字**！
+  `pnpm build` 走的是集成内的同一套采集（`src/integration/fonts.ts`）：接口请求失败时，会退回上一次成功取到的歌单文字（`src/assets/fonts/.subset/meting-text.cache`，同一歌单才复用），没有这份记录时才只用本地文字。单独执行的 `pnpm fonts:subset` 没有这层兜底。
 
 ### 3. 单独执行子集化命令
 ```powershell

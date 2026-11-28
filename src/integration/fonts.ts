@@ -13,6 +13,7 @@ import { FONT_ROLES } from "../types/fontConfig.ts";
 import type { MetingMusicConfig, MusicProvider } from "../types/musicConfig.ts";
 import { buildMetingUrl } from "../utils/music/meting.ts";
 import { getFontFallbackOptions } from "./font-fallback.ts";
+import { collectMetingSongText } from "./meting-text.ts";
 import { loadConfigModule } from "./resolve/load-config.ts";
 import type { ResolvedShironesPaths } from "./types.ts";
 
@@ -66,6 +67,13 @@ const COMMON_SYMBOLS =
 	"，。！？；：、‘’“”【】《》（）—…·「」『』〔〕｛｝〜～￥$€£%^&*+-*/=<>#@~`|\\_";
 
 export const FONT_OUTPUT_DIRNAME = "fonts";
+
+/**
+ * Kept next to the subset fonts; see `meting-text.ts`. The content is JSON,
+ * but the name is not `.json`: this directory is git-ignored build output, and
+ * Biome (which does not read `.gitignore` here) would otherwise check it.
+ */
+export const METING_TEXT_CACHE_FILE = "meting-text.cache";
 
 /** Absolute path of the directory holding generated subsets. */
 export function fontCacheDir(paths: ResolvedShironesPaths): string {
@@ -169,16 +177,14 @@ interface MusicConfigLike {
 	meting?: MetingMusicConfig;
 }
 
-const METING_USER_AGENT =
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Shirone/1.0";
-
 /**
  * Mirror of the repo-side text collector's Meting step: when the music module
  * runs in `meting`/`mixed` mode, song titles and artist names only exist on
  * the remote playlist API, so the subset would miss those glyphs entirely.
  *
  * Gated by `fontConfig.subsetting.allowRemoteText`; any failure degrades to a
- * warning — remote text is an enhancement, never a build blocker.
+ * warning and to the text of the last successful request (see
+ * `meting-text.ts`) — remote text is an enhancement, never a build blocker.
  *
  * `registryRef` carries the user's component/config overrides and only exists
  * in package mode. Source mode has no `shirones/` overlay at all, but that
@@ -206,49 +212,13 @@ async function collectMetingText(
 	if (!url) return "";
 
 	logger.info(`fetching Meting playlist text: ${url}`);
-	try {
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 8000);
-		const response = await fetch(url, {
-			signal: controller.signal,
-			headers: { "User-Agent": METING_USER_AGENT },
-		});
-		clearTimeout(timeoutId);
-
-		if (!response.ok) {
-			logger.warn(
-				`Meting API returned HTTP ${response.status}, skipping remote song text`,
-			);
-			return "";
-		}
-
-		const data = (await response.json()) as unknown;
-		if (!Array.isArray(data)) return "";
-
-		let songCount = 0;
-		const charSet = new Set<string>();
-		for (const song of data) {
-			const record = song as {
-				name?: string;
-				title?: string;
-				artist?: string;
-				author?: string;
-			};
-			const str = `${record.name ?? record.title ?? ""} ${record.artist ?? record.author ?? ""}`;
-			if (!str.trim()) continue;
-			songCount += 1;
-			for (const ch of str) {
-				if (ch.charCodeAt(0) > 31) charSet.add(ch);
-			}
-		}
-		logger.info(`collected text from ${songCount} Meting remote songs`);
-		return Array.from(charSet).sort().join("");
-	} catch (error) {
-		logger.warn(
-			`failed to fetch Meting playlist text (${(error as Error).message}), continuing with local charset`,
-		);
-		return "";
-	}
+	return collectMetingSongText({
+		url,
+		// The URL carries a per-request timestamp; the configuration does not.
+		source: JSON.stringify(musicConfig.meting ?? {}),
+		cachePath: join(fontCacheDir(paths), METING_TEXT_CACHE_FILE),
+		logger,
+	});
 }
 
 /** Resolve a configured font file to an absolute path on disk. */
