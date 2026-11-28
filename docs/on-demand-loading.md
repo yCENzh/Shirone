@@ -135,6 +135,25 @@ const twikooStyles = await new Promise<string>((resolve, reject) => {
 - **不要**用 `import.meta.env` 做开关：config 文件可能被 Node 上下文（如 `astro.config.mjs`）
   导入，那里 `import.meta.env` 为 `undefined`，会直接崩溃；开关一律走 config 字面量。
 
+#### 全站变体：每页都渲染的特性改用独立文件
+
+内联适合只在少数页面渲染的特性（评论、加密文章）。**每个页面都渲染**的特性
+（持久侧栏里的音乐播放器、全站纹理）如果也内联，同一份 CSS 会在每个 HTML 里
+重复一遍——两者合计约 24 KB／页，而且换页时随 HTML 重新下载。
+
+这类样式走 `src/utils/shell-stylesheets.ts`：
+
+- 仍然不经过 Astro 的 CSS 管线（构建期 Stylus 编译，或 `?raw` 读取），所以不会
+  被提升进共享 CSS；
+- 由端点 `src/pages/shell-styles/[sheet].css.ts` 输出成
+  `/shell-styles/<name>.<内容哈希>.css`，全站一份，可长期缓存；
+- 组件用 `getShellStylesheetHref(name)` 取地址并输出 `<link rel="stylesheet">`；
+- 特性关闭时 `getShellStylesheets()` 不含该项：既不输出文件，也不输出 `<link>`，
+  零额外负担不变。
+
+新增一份全站样式时，在 `shell-stylesheets.ts` 里加一个名字、一个开关判断和一个
+取 CSS 的函数即可，不要为它再建端点。
+
 ### L4 运行时按需加载
 
 - **视口懒加载**：`IntersectionObserver` 进入视口（预留 `rootMargin`）才执行初始化，

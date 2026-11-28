@@ -72,6 +72,7 @@ test.describe("music sidebar architecture", () => {
 				/\.(?:mp3|m4a|ogg|wav)(?:\?|$)/i.test(url) ||
 				/MusicSidebar/i.test(url) ||
 				/music-player/i.test(url) ||
+				/music-sidebar/i.test(url) ||
 				/music\.[a-zA-Z\d_-]+\.js/i.test(url)
 			) {
 				requests.push(url);

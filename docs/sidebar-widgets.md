@@ -104,6 +104,8 @@ interface SidebarWidgetBase {
 - **数据源**：本地 `src/data/music.ts` / 自定义 `tracks` / Meting API 云端歌单；
 - **渲染**：M3 卡片风格播放器（专辑封面、歌曲信息、进度条、播放/上一首/下一首/音量控制）；
 - **零额外负担**：仅在全局 `musicConfig.enable` 且本 widget `enable: true` 时动态加载；
+  样式是一份带内容哈希的独立文件 `/shell-styles/music-sidebar.<hash>.css`，
+  同样只在开启时输出和引用（见 `docs/on-demand-loading.md` §3 L3 的全站变体）；
 - **页面范围**：全页面通用，挂载于持久侧栏中，Swup 导航不中断播放。
 
 ---

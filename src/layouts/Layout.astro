@@ -4,6 +4,7 @@ import Snackbar from "@components/atoms/overlay/Snackbar.svelte";
 import ConfigCarrier from "@components/system/ConfigCarrier.astro";
 import UmamiRuntime from "@components/system/UmamiRuntime.astro";
 import { resolveAsset } from "@utils/asset-utils";
+import { getShellStylesheetHref } from "@utils/shell-stylesheets";
 import { createDefaultSchemeStyle } from "@utils/theme-utils";
 import { pathsEqual, toAbsoluteUrl, url } from "@utils/url-utils";
 import {
@@ -35,7 +36,6 @@ import {
 import { resolvePageWidth } from "../utils/responsive-utils";
 import "../styles/main.css";
 import "../styles/font-faces.css";
-import textureStyles from "../styles/textures.css?raw";
 
 interface Props {
 	title?: string;
@@ -90,6 +90,7 @@ const textureOptions = resolveTextureOptions();
 const defaultTexturePreset = textureOptions.defaultPreset;
 const defaultTextureOpacity = textureOptions.defaultOpacity;
 const textureEnabled = textureOptions.enable;
+const textureStylesheetHref = await getShellStylesheetHref("textures");
 const umamiOptions = resolveUmamiOptions(umamiConfig);
 
 const hasDesktopBanner = hasBannerImages(siteConfig.banner.src.desktop);
@@ -146,7 +147,7 @@ const defaultSchemeStyle = createDefaultSchemeStyle();
 		<meta name="generator" content={Astro.generator} />
 		<style is:inline set:html={defaultSchemeStyle}></style>
 		{fontRoleStyle && <style is:inline set:html={fontRoleStyle}></style>}
-		{textureEnabled && <style is:inline set:html={textureStyles}></style>}
+		{textureStylesheetHref && <link rel="stylesheet" href={textureStylesheetHref} />}
 		{configuredFontRoles.map((role) => (
 			<Font
 				cssVariable={resolvedFontOptions.roles[role].cssVariable as never}
